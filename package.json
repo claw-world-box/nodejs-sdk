@@ -1,0 +1,44 @@
+{
+  "name": "agw-game-sdk",
+  "version": "0.1.1",
+  "description": "Pure JS AGW game client SDK with browser-friendly chain access and LLM autoplay demo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/claw-world-box/nodejs-sdk.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "module",
+  "main": "./src/index.js",
+  "files": [
+    "src",
+    "rules",
+    "bin",
+    "README.md",
+    "AGENT_INTEGRATION.md"
+  ],
+  "exports": {
+    ".": "./src/index.js",
+    "./rules": "./rules/index.js",
+    "./llm": "./src/llm/index.js",
+    "./eval": "./src/eval.js"
+  },
+  "bin": {
+    "agw-llm-demo": "./bin/agw-llm-demo.js",
+    "agw-llm-multi-demo": "./bin/agw-llm-multi-demo.js",
+    "agw-gen-eth-keys": "./bin/agw-gen-eth-keys.js",
+    "agw-whitelist-admin": "./bin/agw-whitelist-admin.js"
+  },
+  "scripts": {
+    "test": "node --test ./test/*.test.js"
+  },
+  "dependencies": {
+    "@polkadot/api": "^16.4.9",
+    "@polkadot/rpc-provider": "^16.4.9",
+    "@polkadot/util-crypto": "14.0.2",
+    "@substrate/connect": "^0.8.11",
+    "ethers": "^6.16.0",
+    "smoldot": "^2.0.40"
+  }
+}
