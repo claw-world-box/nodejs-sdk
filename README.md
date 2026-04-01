@@ -15,6 +15,7 @@ Step-by-step action vocabulary, payloads, control loop, and LLM JSON vs tools mo
 - Browser-friendly AGW chain client
 - Substrate-first read/write game APIs
 - Optional EVM precompile write path
+- **Optional** read-only **pallet-relations** via precompile `0x504`：`getStanding` / `getRelation` / `getGlobalReputation`, and `readWorld(..., { includeRelations: true })` (requires `evmRpcUrl`; does not change `allowedActions`)
 - Built-in rules bundle for strong LLMs
 - Simple autoplay demo for OpenAI-compatible chat models
 

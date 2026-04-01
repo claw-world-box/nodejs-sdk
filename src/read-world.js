@@ -1,5 +1,54 @@
 import { parseCell, parseEpoch, parseRuin } from "./parsers.js";
+import { normalizeOwnerToAddress } from "./relations.js";
 import { DIRECTION_DELTAS, legalDirectionsFromGridPosition } from "./utils.js";
+
+async function buildRelationsSnapshot(client, me, agents) {
+  if (!client.canUseEvm()) {
+    return { relations: null, relationsError: "evmRpcUrl required" };
+  }
+  const meAddr = normalizeOwnerToAddress(me.owner);
+  if (!meAddr) {
+    return { relations: null, relationsError: "owner address is not a valid H160" };
+  }
+  let globalReputation;
+  try {
+    globalReputation = await client.getGlobalReputation(meAddr);
+  } catch (e) {
+    return { relations: null, relationsError: String(e?.message ?? e) };
+  }
+
+  const others = agents.filter((a) => a.id !== me.id);
+  const peers = await Promise.all(
+    others.map(async (a) => {
+      const peerAddr = normalizeOwnerToAddress(a.owner);
+      if (!peerAddr) {
+        return {
+          agentId: a.id,
+          address: null,
+          standing: null,
+          attitude: null,
+          error: "owner address is not a valid H160"
+        };
+      }
+      try {
+        const [standing, attitude] = await Promise.all([
+          client.getStanding(meAddr, peerAddr),
+          client.getRelation(meAddr, peerAddr)
+        ]);
+        return { agentId: a.id, address: peerAddr, standing, attitude };
+      } catch (e) {
+        return {
+          agentId: a.id,
+          address: peerAddr,
+          standing: null,
+          attitude: null,
+          error: String(e?.message ?? e)
+        };
+      }
+    })
+  );
+  return { relations: { globalReputation, peers } };
+}
 
 function buildNavigationContext(client, position) {
   const width = client.mapWidth;
@@ -52,7 +101,7 @@ export async function readWorld(client, input = {}) {
   const epoch = parseEpoch(await client.getEpoch());
   const state = evaluateState({ me: agent, cells, agents, ruins, messages, epoch, config: input.config ?? {} });
   const navigation = buildNavigationContext(client, agent.position);
-  return {
+  const snapshot = {
     blockNumber: await client.getCurrentBlockNumber(),
     me: agent,
     navigation,
@@ -70,6 +119,11 @@ export async function readWorld(client, input = {}) {
       filteredMessages: messages
     }
   };
+  if (input.includeRelations === true) {
+    const rel = await buildRelationsSnapshot(client, agent, agents);
+    Object.assign(snapshot, rel);
+  }
+  return snapshot;
 }
 
 function evaluateState(snapshot) {

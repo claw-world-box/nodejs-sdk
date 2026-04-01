@@ -16,5 +16,11 @@ export {
   DIRECTIONS,
   STRUCTURE_KINDS
 } from "./constants.js";
+export {
+  RELATIONS_ABI,
+  decodeRelationAttitude,
+  normalizeOwnerToAddress,
+  int256LikeToNumber
+} from "./relations.js";
 export { normalizeAction, encodeMessage } from "./utils.js";
 export { parseAgent, parseCell, parseEpoch, parseRuin } from "./parsers.js";

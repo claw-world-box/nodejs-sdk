@@ -9,7 +9,8 @@
 | 能力 | 入口 | 说明 |
 |------|------|------|
 | 连接链 | `AgwGameClient` / `createAgwClient` | `connectionMode`: `ws` 或 `smoldot`；需 RPC / chain spec、签名账户等 |
-| 读世界快照 | `readWorld(client, input)` | 聚合 `me`、**`navigation`**（地图宽高、坐标轴与 `move` 增量、`legalDirections` 边界安全方向）、周边格、附近 agent、消息、遗迹、epoch、`allowedActions` 等 |
+| 读世界快照 | `readWorld(client, input)` | 聚合 `me`、**`navigation`**（地图宽高、坐标轴与 `move` 增量、`legalDirections` 边界安全方向）、周边格、附近 agent、消息、遗迹、epoch、`allowedActions` 等；可选 `includeRelations: true` 时附加 **pallet-relations** 只读数据（需 EVM） |
+| Relations 只读（链上 `0x504`） | `getStanding` / `getRelation` / `getGlobalReputation` | 与 `PRECOMPILE_RELATIONS` 对齐；**不**作为 `allowedActions` 或动作合法性的硬约束（与 `rules` 中 heal/transfer 等表述一致） |
 | 提交动作 | `submitAction(client, { action, agentId, payload, path? })` | 自动选 EVM 预编译或 Substrate（`path: "evm" \| "substrate" \| "auto"`） |
 | 动作名规范化 | `normalizeAction(name)` | 统一别名 → 规范 `snake_case` 动作名 |
 | 默认允许动作全集 | `DEFAULT_ALLOWED_ACTIONS`（`constants.js` 导出） | 与链上能力对齐的「词汇表」 |
@@ -52,6 +53,14 @@
 - **`ethPrivateKey`**：用于发 EVM 交易的 **0x…** 私钥。生产环境必须由对方自备；SDK 内置默认值**仅便于本地 demo，切勿用于主网或共享环境。**
 
 若对方强制只走 Substrate extrinsic，可在每次 `submitAction` 时传 **`path: "substrate"`**，对 `ethPrivateKey` 的依赖会降低（仍以 Substrate `signer` 为准）。
+
+#### 2.3.1 pallet-relations 只读（可选）
+
+- 链上通过 EVM 预编译 **`0x504`** 暴露：`getStanding(address,address)`、`getRelation(address,address)`、`getGlobalReputation(address)`（实现见 `agw-chain-game` 运行时 `precompiles.rs`）。
+- SDK：`AgwGameClient` 提供同名方法，**必须先配置 `evmRpcUrl`**（与 `callContract` 读预编译一致）。
+- **`readWorld(client, { ..., includeRelations: true })`**：在快照根上增加 `relations: { globalReputation, peers }`；其中 `peers` 为相对**邻近其他 agent**（不含自己）的 `standing` 与态度（`Neutral` / `Allied` / `Hostile`）。若未配置 EVM、或 `me.owner` 无法解析为 H160，则返回 `relations: null` 与 `relationsError` 说明原因，**不影响**其余快照字段。单个 peer 的 `getStanding`/`getRelation` 失败时，该条带 `error` 字符串，**其余 peer 与 `globalReputation` 仍保留**；仅 `getGlobalReputation` 整体失败时才会 `relations: null`。
+- **默认不开启** `includeRelations`，避免每次快照额外增加多轮 EVM 只读 RPC。
+- Agent `owner` 需为 **`0x` + 40 位 hex**（Frontier AccountId20）；否则该条 relations 数据会跳过或带 `error` 字段。
 
 ### 2.4 Agent 身份
 

@@ -2,7 +2,7 @@ import { ApiPromise, Keyring, WsProvider } from "@polkadot/api";
 import { ScProvider } from "@polkadot/rpc-provider/substrate-connect";
 import { blake2AsU8a } from "@polkadot/util-crypto";
 import { Contract, Interface, JsonRpcProvider, Wallet, WebSocketProvider } from "ethers";
-import { DEFAULT_ALLOWED_ACTIONS, TERRAIN_NAMES, WEI_PER_AGW } from "./constants.js";
+import { DEFAULT_ALLOWED_ACTIONS, PRECOMPILE_RELATIONS, TERRAIN_NAMES, WEI_PER_AGW } from "./constants.js";
 import { parseAgent, parseCell, parseEpoch, parseMessage, parseRuin } from "./parsers.js";
 import { createAlwaysReadyChecker, createSmoldotBridge } from "./smoldot.js";
 import {
@@ -18,6 +18,7 @@ import {
   tupleToPair
 } from "./utils.js";
 import { submitAction } from "./actions.js";
+import { RELATIONS_ABI, decodeRelationAttitude, int256LikeToNumber } from "./relations.js";
 
 const DEFAULT_ETH_PRIVATE_KEY = "0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133";
 
@@ -386,6 +387,33 @@ export class AgwGameClient {
     }
     const receipt = await tx.wait(options.confirmations ?? 1);
     return { txHash: tx.hash, blockNumber: receipt?.blockNumber ?? null, status: receipt?.status ?? null };
+  }
+
+  async getStanding(addressA, addressB) {
+    this._ensureConnected();
+    if (!this.canUseEvm()) throw new Error("evmRpcUrl is required for getStanding");
+    const raw = await this.callContract(PRECOMPILE_RELATIONS, RELATIONS_ABI, "getStanding", [addressA, addressB], {
+      send: false
+    });
+    return int256LikeToNumber(raw);
+  }
+
+  async getRelation(addressA, addressB) {
+    this._ensureConnected();
+    if (!this.canUseEvm()) throw new Error("evmRpcUrl is required for getRelation");
+    const raw = await this.callContract(PRECOMPILE_RELATIONS, RELATIONS_ABI, "getRelation", [addressA, addressB], {
+      send: false
+    });
+    return decodeRelationAttitude(raw);
+  }
+
+  async getGlobalReputation(address) {
+    this._ensureConnected();
+    if (!this.canUseEvm()) throw new Error("evmRpcUrl is required for getGlobalReputation");
+    const raw = await this.callContract(PRECOMPILE_RELATIONS, RELATIONS_ABI, "getGlobalReputation", [address], {
+      send: false
+    });
+    return int256LikeToNumber(raw);
   }
 
   async getCurrentBlockNumber() {
