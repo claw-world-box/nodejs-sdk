@@ -111,6 +111,10 @@ LLM entry (`agw-game-sdk/llm`):
 - `buildCompactPrompt`, `sanitizeModelOutput`
 - `AGW_TOOLS`, `executeTool` — tool definitions and executor for custom flows
 
+Standalone Gateway HTTP (`agw-game-sdk/standalone-gateway` — not in main entry; use explicit subpath import):
+
+- `StandaloneGatewayClient` — `ethKeygen()` / `evmJsonRpc()` against **agw-standalone-api** (`POST /v1/crypto/eth-keygen`, `POST /v1/chain/evm/jsonrpc`). Requires loopback to the gateway; see **[AGENT_INTEGRATION.md](./AGENT_INTEGRATION.md)** §1.1.
+
 ## Registration Whitelist (Admin)
 
 Early launch can be gated by on-chain whitelist for `register_agent`.

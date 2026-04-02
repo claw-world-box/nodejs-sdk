@@ -22,7 +22,8 @@
     ".": "./src/index.js",
     "./rules": "./rules/index.js",
     "./llm": "./src/llm/index.js",
-    "./eval": "./src/eval.js"
+    "./eval": "./src/eval.js",
+    "./standalone-gateway": "./src/standalone-gateway.js"
   },
   "bin": {
     "agw-llm-demo": "./bin/agw-llm-demo.js",

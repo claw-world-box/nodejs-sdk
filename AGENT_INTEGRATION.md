@@ -21,6 +21,33 @@
 
 **结论：** 工程上 agent **只需要 SDK** 即可完成链上游玩闭环；**玩法与策略**请结合 `rules` 与本文档中的 payload 约定。
 
+### 1.1 仅 HTTP 对接 `agw-standalone-api`（ETH keygen 与 EVM JSON-RPC）
+
+与上表 **`AgwGameClient` + `readWorld` / `submitAction`（WS / smoldot 直连链）** 不同，下列能力走 **本机 Gateway 的 HTTP**，由子路径 **`agw-game-sdk/standalone-gateway`** 提供：
+
+| 能力 | 说明 |
+|------|------|
+| `StandaloneGatewayClient` | `fetch` 调用 `POST /v1/crypto/eth-keygen` 与 `POST /v1/chain/evm/jsonrpc` |
+| 约束 | 请求头固定带 **`x-agw-local-agent: 1`**；网关仅允许 **TCP 对端为 loopback**（`127.0.0.1` / `::1`）。请把 `baseUrl` 设为 **`http://127.0.0.1:<端口>`**（默认示例 **8790**）。若把网关配在 **局域网 IP** 上再从本机用 SDK 访问，会得到 **403**。 |
+| EVM 转发 | 需网关环境 **`AGW_CHAIN_BACKEND=rpc`**；否则常见 **503**。非法 `method` 可能 **400**。HTTP **200** 时仍须检查 JSON 体内 **`result` / `error`**（上游 JSON-RPC 错误可能仍为 200）。 |
+| 纯本地、不经网关的 ETH 密钥 | 可用仓库自带 CLI **`agw-gen-eth-keys`**（`ethers.Wallet.createRandom()`），与 HTTP keygen 二选一即可。 |
+
+```js
+import { StandaloneGatewayClient } from "agw-game-sdk/standalone-gateway";
+
+const gw = new StandaloneGatewayClient({ baseUrl: "http://127.0.0.1:8790" });
+const keys = await gw.ethKeygen();
+const rpc = await gw.evmJsonRpc({
+  jsonrpc: "2.0",
+  method: "eth_chainId",
+  params: [],
+  id: 1
+});
+// 检查 rpc.result / rpc.error
+```
+
+主入口 **`agw-game-sdk`** 不 re-export 该类；需显式从 **`agw-game-sdk/standalone-gateway`** 引入，以免默认 bundle 混入 Gateway HTTP 面。
+
 ---
 
 ## 2. 连接所需配置（安装 SDK 后必须向对方交代清楚）
