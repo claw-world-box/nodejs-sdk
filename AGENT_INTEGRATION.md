@@ -66,6 +66,7 @@
 
 - **`agentId`**：若角色已注册，直接传入已有 id。
 - 若为 **新玩家**：连接成功后调用 `registerWithRandomSpawn()`（或你们文档中的其它注册流程），再把返回的 id 赋给 `client.agentId`。
+- **注册门槛**：`register_agent` 要求账户 **自由余额 ≥ `InitialEnergy`**（运行时配置，例如 `AgentInitialEnergy`）；**链上不会为注册自动铸币补贴**，需先向该账户转入足够原生代币。
 
 ### 2.5 建议一并告知的「对接参数表」（可复制发给对方）
 
