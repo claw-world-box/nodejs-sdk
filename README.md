@@ -1,231 +1,91 @@
-# agw-game-sdk
+# @clawworld/agw-game-sdk
 
-本包源码维护在独立仓库 **[nodejs-sdk](https://github.com/claw-world-box/nodejs-sdk)**（npm 包名仍为 `agw-game-sdk`）。若你在 `agw` 主仓库的旧文档里看到 `agw/agw-game-sdk/`，请改指向本仓库。
+JavaScript SDK for the AGW chain: connect over WebSocket or [smoldot](https://github.com/smol-dot/smoldot), read game state, and submit actions via Substrate extrinsics or optional EVM precompiles.
 
-`agw-game-sdk` is a pure JavaScript AGW client SDK for game developers. It is meant for connecting a game client to the chain, reading game state, submitting actions, and optionally letting a strong LLM play through a simple autoplay loop.
-
-This package intentionally does not include the old Rust/WASM pipeline, multi-stage decision stack, memory system, or small-model orchestration logic. It focuses on direct client integration.
-
-## Agent integration (third-party LLM / autonomous agents)
-
-Step-by-step action vocabulary, payloads, control loop, and LLM JSON vs tools mode are documented in **[AGENT_INTEGRATION.md](./AGENT_INTEGRATION.md)** (Chinese). Point external teams (e.g. Claude tool-use, custom Claw-style orchestrators) at that file plus `agw-game-sdk/rules` for prompt text.
-
-## What It Includes
-
-- Browser-friendly AGW chain client
-- Substrate-first read/write game APIs
-- Optional EVM precompile write path
-- **Optional** read-only **pallet-relations** via precompile `0x504`：`getStanding` / `getRelation` / `getGlobalReputation`, and `readWorld(..., { includeRelations: true })` (requires `evmRpcUrl`; does not change `allowedActions`)
-- **Epoch read**: `getEpoch()` uses Substrate storage; **`epoch.beaconPool` / `epoch.epochTreasury`** 是纪元金库余额（wei 字符串），**不是** Beacon 熵记分。熵需在有 `evmRpcUrl` 时调用 **`getBeaconEntropy()`**（`PRECOMPILE_EPOCH` 只读调用，返回 **`bigint` wei**，完整 `uint256`、不做 i32 截断）
-- Built-in rules bundle for strong LLMs
-- Simple autoplay demo for OpenAI-compatible chat models
+**npm** publishes this package as **`@clawworld/agw-game-sdk`**. **Source** lives at [github.com/claw-world-box/nodejs-sdk](https://github.com/claw-world-box/nodejs-sdk).
 
 ## Install
 
 ```bash
-git clone https://github.com/claw-world-box/nodejs-sdk.git
-cd nodejs-sdk
-npm install
+npm install @clawworld/agw-game-sdk
 ```
 
-发布到 npm 后也可：`npm install agw-game-sdk`。
+## Requirements
 
-## Minimal Use
+- Node.js 18+
+- **Read-only** RPC usage does not require signing credentials.
+- **Writes**: set `signerUri` / `signer` (Substrate) or `evmRpcUrl` + `ethPrivateKey` (EVM path).
 
-### Quickstart: auto registration (recommended)
+## Quick start (mainnet registration)
 
-一键：**生成或加载钱包（落盘）→ 领水 → smoldot 连主网 → 注册 agent**，并写回 `lastRegisteredAgentId`。默认钱包路径：Linux `~/.config/agw/default-wallet.json`，macOS `~/Library/Application Support/agw/`，Windows `%APPDATA%\agw\`（见 `getDefaultAgwConfigDir()`）。
+Default: **ensure wallet on disk → faucet → smoldot + mainnet preset → register**, then persist `agentId`. Second run skips faucet/register if the wallet already has `lastRegisteredAgentId`.
 
 ```js
-import { bootstrapRegistration } from "agw-game-sdk";
+import { bootstrapRegistration } from "@clawworld/agw-game-sdk";
 
-const { client, agentId, walletPath, skippedFaucet, skippedRegistration } =
-  await bootstrapRegistration();
-console.log({ agentId, walletPath, skippedFaucet, skippedRegistration });
+const { client, agentId, walletPath } = await bootstrapRegistration();
+console.log({ agentId, walletPath });
 await client.disconnect();
 ```
 
-再次运行会复用已保存钱包；若已有 `lastRegisteredAgentId` 则跳过领水与注册，仅 `connect` 并恢复会话。
-
-**仅恢复会话（不触发注册宏）：**
+Resume with a saved wallet only (no full bootstrap):
 
 ```js
-import { connectRegisteredSession } from "agw-game-sdk";
+import { connectRegisteredSession } from "@clawworld/agw-game-sdk";
 
 const { client, agentId } = await connectRegisteredSession();
 await client.disconnect();
 ```
 
-子路径导出（按需 tree-shake）：`agw-game-sdk/wallet-store`、`agw-game-sdk/bootstrap`、`agw-game-sdk/session`。
+Optional FSM/NPC loop is **not** on the main entry; use `import { AgwFsmNpcClient } from "@clawworld/agw-game-sdk/fsm-client"`.
 
-### Mainnet preset (embedded chain spec + bootnodes)
-
-The package ships `assets/mainnet-chain-spec-raw.json` (~6.7MB). With `connectionMode: "smoldot"` and default `networkPreset: "mainnet"`, you do **not** need to pass `smoldotChainSpec` / `smoldotChainSpecUrl` unless you want to override. Bootnodes default to the same multiaddr as the Rust `embed-mainnet-defaults` build.
-
-### Optional: FSM / NPC loop (subpath, not main export)
-
-主入口 **不** 导出 `AgwFsmNpcClient`；需要规则驱动 NPC 时从子路径引入：
+## Manual client (WS or custom smoldot spec)
 
 ```js
-import { bootstrapRegistration } from "agw-game-sdk";
-import { AgwFsmNpcClient } from "agw-game-sdk/fsm-client";
-
-const { client } = await bootstrapRegistration();
-const npc = new AgwFsmNpcClient(client, { maxIterations: 5, intervalMs: 5000 });
-await npc.start();
-await client.disconnect();
-```
-
-Use `networkPreset: "none"` and provide `smoldotChainSpec` / `smoldotChainSpecUrl` for non-mainnet chains.
-
-### Custom smoldot spec (manual low-level flow)
-
-```js
-import { AgwGameClient } from "agw-game-sdk";
-
-const client = new AgwGameClient({
-  connectionMode: "smoldot",
-  networkPreset: "none",
-  smoldotChainSpec: "<chain spec json text>",
-  signerUri: "//Alice"
-});
-
-await client.connect();
-const registered = await client.registerWithRandomSpawn();
-const me = await client.getAgent(registered.agentId);
-const cells = await client.watchSurroundings(2, { agentId: me.id });
-console.log({ me, cells });
-```
-
-`readWorld()` snapshots include **`fsmState`**, **`fsmAllowedActions`**, and **`fsmConfig`**. **`state`** and **`allowedActions`** stay as compatibility aliases (same values as the `fsm*` fields).
-
-## LLM Demo
-
-By default the agent uses **OpenAI-style tool calling**: the model is given tools for all SDK actions (move, harvest, attack, heal, transfer, broadcast, scout, build, etc.) and read APIs (read_world, get_agent, watch_surroundings). The SDK executes tool calls and can run multiple rounds per tick (e.g. read_world then move). Set `useTools: false` in options to fall back to the legacy JSON-only mode. Default `maxToolRounds` is `2`.
-
-The demo feeds the model:
-
-- built-in AGW rules
-- live world snapshot
-- tools for every SDK action and read API (or allowed action list in JSON mode)
-- previous step result
-
-Run it like this:
-
-```bash
-AGW_SMOLDOT_CHAIN_SPEC_PATH=/path/to/spec.json \
-AGW_SIGNER_URI=//Alice \
-OPENAI_BASE_URL=http://127.0.0.1:1234/v1 \
-OPENAI_MODEL=gpt-4.1 \
-node ./bin/agw-llm-demo.js
-```
-
-## Exports
-
-Main entry:
-
-- `AgwGameClient`
-- `createAgwClient`
-- `getFsmAllowedActionsForState`
-- `mainnetPreset`, `resolveMainnetChainSpecJson`, `loadMainnetChainSpecJsonSync`, `AGW_MAINNET_*` constants
-- `createRandomEthWallet`, `walletFromPrivateKey`
-- `AgwFaucetClient`
-- `AgwFsmNpcClient`, `runAutoplayCore`, `defaultNpcPolicy`
-- `PROMPT_FSM_DEFAULTS`
-- `submitAction`
-- `readWorld`
-- `enableRegistrationWhitelist`
-- `addWhitelistBatch`
-- `removeWhitelistBatch`
-- `addWhitelistInChunks`
-- `PRECOMPILE_WORLD`
-- `PRECOMPILE_ACTION`
-- `PRECOMPILE_EPOCH`
-- `PRECOMPILE_ADMIN`（`0x503`）
-- `PRECOMPILE_RELATIONS`（`0x504`，relations 只读）
-- `DIRECTIONS`
-- `STRUCTURE_KINDS`
-
-Rules entry:
-
-- `GAME_RULES_TEXT`
-- `GAME_RULES_SECTIONS`
-- `buildRulesPrompt`
-
-Eval entry (`agw-game-sdk/eval` — model output checks / SFT):
-
-- `evaluateModelOutput`, `extractActionCandidate`, `collectFailureSamples`
-
-LLM entry (`agw-game-sdk/llm`):
-
-- `runAutoplayLoop` — default `useTools: true` (tool calling)
-- `runAutoplayLoop` hooks:
-  - `contextBuilder({ iteration, snapshot, recentResult, allowedActions })`
-  - `onDecisionInput({ iteration, useTools, decisionInput, metrics })`
-  - `initialRecentResult` / `onRecentResult`
-- `requestOpenAiCompatibleDecisionWithTools` — one request + tool loop
-- `requestOpenAiCompatibleDecision` — JSON-only (no tools)
-- `buildAutoplayPrompt`, `parseModelAction`
-- `buildCompactPrompt`, `sanitizeModelOutput`
-- `AGW_TOOLS`, `executeTool` — tool definitions and executor for custom flows
-
-Subpath exports (optional):
-
-- `agw-game-sdk/mainnet-preset` — same symbols as main entry `mainnetPreset` / chain spec loaders
-- `agw-game-sdk/wallet` — `createRandomEthWallet`, `walletFromPrivateKey`
-- `agw-game-sdk/faucet` — `AgwFaucetClient`
-- `agw-game-sdk/fsm-client` — `AgwFsmNpcClient` (also on main entry)
-
-Standalone Gateway HTTP (`agw-game-sdk/standalone-gateway` — not in main entry; use explicit subpath import):
-
-- `StandaloneGatewayClient` — optional compatibility layer for **agw-standalone-api** (`POST /v1/crypto/eth-keygen`, `POST /v1/chain/evm/jsonrpc`). Requires loopback to the gateway; see **[AGENT_INTEGRATION.md](./AGENT_INTEGRATION.md)** §1.1. Prefer **`createRandomEthWallet`** + **`AgwFaucetClient`** for standalone SDK usage.
-
-## Registration Whitelist (Admin)
-
-Early launch can be gated by on-chain whitelist for `register_agent`.
-
-```js
-import {
-  AgwGameClient,
-  enableRegistrationWhitelist,
-  addWhitelistInChunks
-} from "agw-game-sdk";
+import { AgwGameClient } from "@clawworld/agw-game-sdk";
 
 const client = new AgwGameClient({
   connectionMode: "ws",
-  wsUrl: "ws://127.0.0.1:9944",
-  signerUri: "//Alice" // sudo key on local/dev chain
+  wsUrl: process.env.AGW_WS_URL,
+  signerUri: process.env.AGW_SIGNER_URI,
+  evmRpcUrl: process.env.AGW_EVM_RPC_URL,
+  ethPrivateKey: process.env.AGW_ETH_PRIVKEY
 });
 
 await client.connect();
-await enableRegistrationWhitelist(client, true); // sudo.sudo(agent.setRegistrationWhitelistEnabled(true))
-await addWhitelistInChunks(client, ["0x1234...", "0xabcd..."], 500);
-await client.disconnect();
+const me = await client.getAgent(1);
 ```
 
-CLI bulk import:
+## Package exports
 
-```bash
-AGW_CONNECTION_MODE=ws \
-SUBSTRATE_WS_URL=ws://127.0.0.1:9944 \
-AGW_SIGNER_URI=//Alice \
-node ./bin/agw-whitelist-admin.js add --file ./addresses.txt --chunk-size 500
+| Subpath | Purpose |
+|---------|---------|
+| `@clawworld/agw-game-sdk` | Core client, `bootstrapRegistration`, wallet helpers, `readWorld`, constants |
+| `@clawworld/agw-game-sdk/rules` | Rules text for LLM prompts |
+| `@clawworld/agw-game-sdk/llm` | Optional OpenAI-compatible helpers |
+| `@clawworld/agw-game-sdk/eval` | Model output checks |
+| `@clawworld/agw-game-sdk/standalone-gateway` | Local HTTP gateway helper (loopback-only) |
+| `@clawworld/agw-game-sdk/mainnet-preset` | Embedded mainnet chain spec + bootnodes |
+| `@clawworld/agw-game-sdk/wallet` | ETH wallet helpers |
+| `@clawworld/agw-game-sdk/wallet-store` | Wallet JSON on disk |
+| `@clawworld/agw-game-sdk/faucet` | HTTP faucet client |
+| `@clawworld/agw-game-sdk/bootstrap` | `bootstrapRegistration` |
+| `@clawworld/agw-game-sdk/session` | `loadRegisteredSession`, `connectRegisteredSession` |
+| `@clawworld/agw-game-sdk/fsm-client` | Optional NPC / FSM loop |
 
-node ./bin/agw-whitelist-admin.js enable
-```
+## Epoch and EVM reads
 
-`addresses.txt` supports one address per line (lines starting with `#` are ignored) or a JSON array file.
+- `getEpoch()` returns treasury-related fields from chain storage; it is not the beacon entropy score.
+- With `evmRpcUrl` set, use `getBeaconEntropy()` for entropy (returns `bigint` wei).
 
-## Snapshot `allowedActions` vs gateway
+## Snapshot `allowedActions`
 
-`readWorld().allowedActions` is derived from a **static FSM table** (`getAllowedActions`) aligned with the prompt-layer FSM in **rust-api-client** `game_prompt_align`, not from chain rules. It does **not** include dynamic extras that **agw-standalone-api** adds to `fsm_allowed_actions` (e.g. structure funding at certain balances). If you use the HTTP gateway, treat **`fsm_allowed_actions`** and **`POST /v1/actions/validate`** as authoritative for what may be submitted.
+`readWorld().allowedActions` comes from a static FSM table in the SDK. If you use an AGW HTTP gateway, use its allowed-actions list as the source of truth for submissions.
 
-## Dependency upgrades
+## Breaking changes
 
-Behavior fixes and dependency version bumps are intentionally separate: upgrade `@polkadot/*`, `smoldot`, or `ethers` only on a branch where `npm test` is green, and in small cohorts (transport stack first, then ethers).
+Versions prior to this release shipped a default Ethereum dev key and a default `//Alice` signer for development. **These defaults are removed.** Provide `signerUri` / `signer` and `ethPrivateKey` explicitly.
 
-## Notes
+## License
 
-- The SDK is browser-oriented, but the demo runs in Node.
-- `getCell()` works in lazy-world mode by deriving deterministic cells from on-chain seed when storage is empty.
-- The first version prefers chain-safe, simple behavior over complex autonomy infrastructure.
+MIT — see [LICENSE](./LICENSE).

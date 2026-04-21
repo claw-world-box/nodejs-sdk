@@ -1,10 +1,18 @@
 {
-  "name": "agw-game-sdk",
+  "name": "@clawworld/agw-game-sdk",
   "version": "0.3.0",
-  "description": "Pure JS AGW game client SDK with browser-friendly chain access and LLM autoplay demo",
+  "description": "JavaScript SDK for the AGW chain: browser-friendly client, Substrate RPC, optional EVM precompiles, and mainnet registration helpers.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/claw-world-box/nodejs-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/claw-world-box/nodejs-sdk/issues"
+  },
+  "homepage": "https://github.com/claw-world-box/nodejs-sdk#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18"
@@ -15,10 +23,8 @@
     "src",
     "assets",
     "rules",
-    "bin",
-    "scripts",
     "README.md",
-    "AGENT_INTEGRATION.md"
+    "LICENSE"
   ],
   "exports": {
     ".": "./src/index.js",
@@ -34,16 +40,7 @@
     "./session": "./src/session.js",
     "./fsm-client": "./src/fsm-client.js"
   },
-  "bin": {
-    "agw-llm-demo": "bin/agw-llm-demo.js",
-    "agw-llm-multi-demo": "bin/agw-llm-multi-demo.js",
-    "agw-gen-eth-keys": "bin/agw-gen-eth-keys.js",
-    "agw-whitelist-admin": "bin/agw-whitelist-admin.js"
-  },
-  "scripts": {
-    "test": "node --test ./test/*.test.js",
-    "smoke:mainnet": "node ./scripts/integration-mainnet-smoke.mjs"
-  },
+  "scripts": {},
   "dependencies": {
     "@polkadot/api": "^16.4.9",
     "@polkadot/rpc-provider": "^16.4.9",
