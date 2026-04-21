@@ -62,9 +62,12 @@ export function parseRuin(x, y, value) {
 
 export function parseEpoch(value) {
   if (!value) return null;
+  const beaconPool = String(value.beaconPool ?? value.beacon_pool ?? 0);
   return {
     index: toNumber(value.index ?? value.currentEpoch ?? value.current_epoch ?? 0),
-    beaconPool: String(value.beaconPool ?? value.beacon_pool ?? 0),
+    beaconPool,
+    /** Same wei string as `beaconPool` — epoch treasury balance, not beacon entropy. */
+    epochTreasury: beaconPool,
     beaconTarget: String(value.beaconTarget ?? value.beacon_target ?? 0),
     startBlock: toNumber(value.startBlock ?? value.epochStartBlock ?? value.epoch_start_block ?? 0)
   };

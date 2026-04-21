@@ -1,15 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { WEI_PER_AGW } from "../src/constants.js";
 import { readWorld } from "../src/read-world.js";
 
 function baseAgent(overrides = {}) {
+  const nativeBalance =
+    overrides.nativeBalance !== undefined ? overrides.nativeBalance : 100n * WEI_PER_AGW;
   return {
     id: 1,
     owner: "0x1111111111111111111111111111111111111111",
     position: { x: 5, y: 5 },
     hp: 100,
     hpMax: 100,
-    energy: "100",
+    energy: String(nativeBalance / WEI_PER_AGW),
     status: "Active",
     tier: "Normal",
     bornAtBlock: 0,
@@ -18,8 +21,8 @@ function baseAgent(overrides = {}) {
     lastEpochSeen: 0,
     sleepUntilBlock: 0,
     epochBadges: 0,
-    nativeBalance: 0n,
-    balanceWei: "0",
+    nativeBalance,
+    balanceWei: nativeBalance.toString(),
     ...overrides
   };
 }
@@ -34,7 +37,7 @@ function minimalClient(overrides = {}) {
     watchSurroundings: overrides.watchSurroundings,
     getNearbyAgents: overrides.getNearbyAgents,
     getRecentMessages: overrides.getRecentMessages,
-    getRuin: overrides.getRuin,
+    getRuin: overrides.getRuin ?? (async () => null),
     getEpoch: overrides.getEpoch,
     getCurrentBlockNumber: overrides.getCurrentBlockNumber,
     getAllowedActions: overrides.getAllowedActions ?? (() => ["move", "harvest"])
@@ -248,4 +251,141 @@ test("readWorld includeRelations without evm sets relationsError", async () => {
   const snap = await readWorld(client, { agentId: 1, includeRelations: true });
   assert.equal(snap.relations, null);
   assert.match(snap.relationsError, /evmRpcUrl/);
+});
+
+test("readWorld InRuin from center cell terrain Ruin", async () => {
+  const client = minimalClient({
+    async getAgent(id) {
+      return baseAgent({ id, nativeBalance: 200n * WEI_PER_AGW });
+    },
+    async watchSurroundings() {
+      return [{ x: 5, y: 5, terrain: "Ruin", occupants: 0 }];
+    },
+    async getNearbyAgents() {
+      return [];
+    },
+    async getRuin() {
+      return { level: 1, hp: 10, maxHp: 10 };
+    },
+    async getRecentMessages() {
+      return [];
+    },
+    async getEpoch() {
+      return { index: 0, beaconPool: "0", beaconTarget: "0", startBlock: 0 };
+    },
+    async getCurrentBlockNumber() {
+      return 100;
+    }
+  });
+  const snap = await readWorld(client, { agentId: 1 });
+  assert.equal(snap.state, "InRuin");
+});
+
+test("readWorld Recover after Critical when balance below exit threshold", async () => {
+  let nativeBalance = 100n * WEI_PER_AGW;
+  const client = minimalClient({
+    async getAgent(id) {
+      return baseAgent({ id, nativeBalance, energy: String(nativeBalance / WEI_PER_AGW) });
+    },
+    async watchSurroundings() {
+      return [{ x: 5, y: 5, terrain: "Plain", occupants: 0 }];
+    },
+    async getNearbyAgents() {
+      return [];
+    },
+    async getRecentMessages() {
+      return [];
+    },
+    async getEpoch() {
+      return { index: 0, beaconPool: "0", beaconTarget: "0", startBlock: 0 };
+    },
+    async getCurrentBlockNumber() {
+      return 100;
+    }
+  });
+  let snap = await readWorld(client, { agentId: 1 });
+  assert.equal(snap.state, "Critical");
+  nativeBalance = 180n * WEI_PER_AGW;
+  snap = await readWorld(client, { agentId: 1 });
+  assert.equal(snap.state, "Recover");
+});
+
+test("readWorld Combat when center cell has multiple occupants", async () => {
+  const client = minimalClient({
+    async getAgent(id) {
+      return baseAgent({ id, nativeBalance: 200n * WEI_PER_AGW });
+    },
+    async watchSurroundings() {
+      return [{ x: 5, y: 5, terrain: "Plain", occupants: 2 }];
+    },
+    async getNearbyAgents() {
+      return [];
+    },
+    async getRecentMessages() {
+      return [];
+    },
+    async getEpoch() {
+      return { index: 0, beaconPool: "0", beaconTarget: "0", startBlock: 0 };
+    },
+    async getCurrentBlockNumber() {
+      return 100;
+    }
+  });
+  const snap = await readWorld(client, { agentId: 1 });
+  assert.equal(snap.state, "Combat");
+});
+
+test("readWorld falls back to agent distances when cells omit occupants", async () => {
+  const client = minimalClient({
+    async getAgent(id) {
+      return baseAgent({ id, nativeBalance: 200n * WEI_PER_AGW });
+    },
+    async watchSurroundings() {
+      return [{ x: 5, y: 5, terrain: "Plain" }];
+    },
+    async getNearbyAgents() {
+      return [{ ...baseAgent({ id: 2, position: { x: 6, y: 5 }, nativeBalance: 50n * WEI_PER_AGW }), distance: 1 }];
+    },
+    async getRecentMessages() {
+      return [];
+    },
+    async getEpoch() {
+      return { index: 0, beaconPool: "0", beaconTarget: "0", startBlock: 0 };
+    },
+    async getCurrentBlockNumber() {
+      return 100;
+    }
+  });
+  const snap = await readWorld(client, { agentId: 1 });
+  assert.equal(snap.state, "Combat");
+});
+
+test("readWorld does not pick Scout while recovering HP", async () => {
+  const client = minimalClient({
+    async getAgent(id) {
+      return baseAgent({
+        id,
+        hp: 50,
+        hpMax: 100,
+        nativeBalance: 200n * WEI_PER_AGW
+      });
+    },
+    async watchSurroundings() {
+      return [{ x: 5, y: 5, terrain: "Plain", occupants: 0 }];
+    },
+    async getNearbyAgents() {
+      return [];
+    },
+    async getRecentMessages() {
+      return [];
+    },
+    async getEpoch() {
+      return { index: 0, beaconPool: "0", beaconTarget: "0", startBlock: 0 };
+    },
+    async getCurrentBlockNumber() {
+      return 100;
+    }
+  });
+  const snap = await readWorld(client, { agentId: 1 });
+  assert.equal(snap.state, "Explore");
 });

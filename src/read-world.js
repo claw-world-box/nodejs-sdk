@@ -1,6 +1,86 @@
+import { WEI_PER_AGW } from "./constants.js";
 import { parseCell, parseEpoch, parseRuin } from "./parsers.js";
 import { normalizeOwnerToAddress } from "./relations.js";
-import { DIRECTION_DELTAS, legalDirectionsFromGridPosition } from "./utils.js";
+import { DIRECTION_DELTAS, legalDirectionsFromGridPosition, toBigInt } from "./utils.js";
+
+/** Matches `rust-api-client` `game_prompt_align::PromptFsmConfig::default()` (thresholds only). */
+export const PROMPT_FSM_DEFAULTS = Object.freeze({
+  criticalEnergy: 150,
+  criticalExitEnergy: 200,
+  criticalHp: 30,
+  recoverHp: 72,
+  encounterDistance: 2,
+  safeScoutBalance: 80
+});
+
+/** Per `AgwGameClient` instance + agent id; avoids cross-instance FSM bleed in tests. */
+const fsmPrevByClient = new WeakMap();
+
+function getFsmPrevMap(client) {
+  let m = fsmPrevByClient.get(client);
+  if (!m) {
+    m = new Map();
+    fsmPrevByClient.set(client, m);
+  }
+  return m;
+}
+
+function getPreviousFsm(client, agentId) {
+  return getFsmPrevMap(client).get(Number(agentId));
+}
+
+function setPreviousFsm(client, agentId, state) {
+  getFsmPrevMap(client).set(Number(agentId), state);
+}
+
+/** Native wei to whole-token units, matching `chain.rs` `WEI_PER_DA` / balance_da. */
+function balanceDaFromMe(me) {
+  if (!me) return 0;
+  const wei = toBigInt(me.nativeBalance ?? me.balanceWei ?? 0);
+  return Number(wei / WEI_PER_AGW);
+}
+
+function mergeFsmConfig(config) {
+  return {
+    criticalEnergy: Number(config.criticalEnergy ?? PROMPT_FSM_DEFAULTS.criticalEnergy),
+    criticalExitEnergy: Number(config.criticalExitEnergy ?? PROMPT_FSM_DEFAULTS.criticalExitEnergy),
+    criticalHp: Number(config.criticalHp ?? PROMPT_FSM_DEFAULTS.criticalHp),
+    recoverHp: Number(config.recoverHp ?? PROMPT_FSM_DEFAULTS.recoverHp),
+    encounterDistance: Number(config.encounterDistance ?? PROMPT_FSM_DEFAULTS.encounterDistance),
+    safeScoutBalance: Number(config.safeScoutBalance ?? PROMPT_FSM_DEFAULTS.safeScoutBalance)
+  };
+}
+
+/**
+ * Mirrors `game_prompt_align::nearest_other_agent_distance`: center cell with >1 occupant => 0;
+ * else minimum Manhattan distance to a cell with occupants > 0 and distance >= 1.
+ * Falls back to `agents[].distance` when cells do not expose `occupants`.
+ */
+export function nearestOtherAgentDistance(cells, cx, cy, fallbackAgents) {
+  const center = cells.find((c) => Number(c.x) === cx && Number(c.y) === cy);
+  const centerOcc =
+    center && center.occupants != null && center.occupants !== undefined
+      ? Number(center.occupants)
+      : null;
+  if (centerOcc !== null && centerOcc > 1) {
+    return 0;
+  }
+
+  const cellsDefineOccupants = cells.some((c) => c.occupants != null && c.occupants !== undefined);
+  if (cellsDefineOccupants) {
+    let minD = Infinity;
+    for (const c of cells) {
+      const o = Number(c.occupants ?? 0);
+      if (o <= 0) continue;
+      const d = Math.abs(Number(c.x) - cx) + Math.abs(Number(c.y) - cy);
+      if (d >= 1) minD = Math.min(minD, d);
+    }
+    return minD === Infinity ? Infinity : minD;
+  }
+
+  if (!Array.isArray(fallbackAgents) || fallbackAgents.length === 0) return Infinity;
+  return Math.min(...fallbackAgents.map((a) => Number(a.distance ?? 99)));
+}
 
 async function buildRelationsSnapshot(client, me, agents) {
   if (!client.canUseEvm()) {
@@ -99,7 +179,19 @@ export async function readWorld(client, input = {}) {
   }
 
   const epoch = parseEpoch(await client.getEpoch());
-  const state = evaluateState({ me: agent, cells, agents, ruins, messages, epoch, config: input.config ?? {} });
+  const previousFsm = getPreviousFsm(client, agentId);
+  const state = evaluateState({
+    me: agent,
+    cells,
+    agents,
+    ruins,
+    messages,
+    epoch,
+    config: input.config ?? {},
+    previousFsm
+  });
+  setPreviousFsm(client, agentId, state);
+
   const navigation = buildNavigationContext(client, agent.position);
   const snapshot = {
     blockNumber: await client.getCurrentBlockNumber(),
@@ -127,37 +219,60 @@ export async function readWorld(client, input = {}) {
 }
 
 function evaluateState(snapshot) {
-  const config = snapshot?.config ?? {};
-  const balance = Number(snapshot?.me?.energy ?? snapshot?.me?.nativeBalance ?? 0);
-  const hp = Number(snapshot?.me?.hp ?? 0);
-  const hpMax = Math.max(1, Number(snapshot?.me?.hpMax ?? 1));
-  const nearest = Array.isArray(snapshot?.agents) && snapshot.agents.length > 0
-    ? Math.min(...snapshot.agents.map((agent) => Number(agent.distance ?? 99)))
-    : Number.POSITIVE_INFINITY;
-  const inRuin = Array.isArray(snapshot?.ruins) && snapshot.ruins.some((ruin) => Number(ruin.distance ?? 1) === 0);
-  if (inRuin) return "InRuin";
-  if (balance < Number(config.criticalEnergy ?? 150) || isCriticalHp(hp, hpMax, Number(config.criticalHp ?? 30))) {
+  const cfg = mergeFsmConfig(snapshot?.config ?? {});
+  const me = snapshot?.me;
+  const balanceDa = balanceDaFromMe(me);
+  const hp = Number(me?.hp ?? 0);
+  const hpMax = Math.max(1, Number(me?.hpMax ?? 1));
+  const cells = snapshot?.cells ?? [];
+  const cx = Number(me?.position?.x ?? 0);
+  const cy = Number(me?.position?.y ?? 0);
+
+  const centerCell = cells.find((c) => Number(c.x) === cx && Number(c.y) === cy);
+  const terrain = centerCell ? String(centerCell.terrain ?? "") : "";
+  if (terrain === "Ruin") {
+    return "InRuin";
+  }
+
+  if (balanceDa < cfg.criticalEnergy || isCriticalHp(hp, hpMax, cfg.criticalHp)) {
     return "Critical";
   }
+
+  const prev = snapshot?.previousFsm;
+  if (
+    (prev === "Critical" || prev === "Recover") &&
+    (balanceDa < cfg.criticalExitEnergy || isRecoveringHp(hp, hpMax, cfg.recoverHp))
+  ) {
+    return "Recover";
+  }
+
+  const nearest = nearestOtherAgentDistance(cells, cx, cy, snapshot?.agents ?? []);
+
   if (nearest <= 1) return "Combat";
-  if (nearest <= Number(config.encounterDistance ?? 2)) return "Encounter";
+  if (nearest <= cfg.encounterDistance) return "Encounter";
   if (hasNegotiationSignal(snapshot?.messages ?? [])) return "Negotiate";
-  if (shouldScout(snapshot, balance, hp, hpMax)) return "Scout";
+  if (shouldScout(cells, balanceDa, hp, hpMax, cfg)) return "Scout";
   return "Explore";
 }
 
 function hasNegotiationSignal(messages) {
   return (messages ?? []).some((message) => {
     const text = String(message?.content ?? "").toUpperCase();
-    return text.includes("[ALLY]") || text.includes("[TRUCE]") || text.includes("[NEGOTIATE]") || text.includes("结盟") || text.includes("议和") || text.includes("应和");
+    return (
+      text.includes("[ALLY]") ||
+      text.includes("[TRUCE]") ||
+      text.includes("[NEGOTIATE]") ||
+      text.includes("结盟") ||
+      text.includes("议和") ||
+      text.includes("应和")
+    );
   });
 }
 
-function shouldScout(snapshot, balance, hp, hpMax) {
-  const config = snapshot?.config ?? {};
-  if (balance < Number(config.safeScoutBalance ?? 80)) return false;
-  if (isRecoveringHp(hp, hpMax, Number(config.recoverHp ?? 72))) return false;
-  return !(snapshot?.cells ?? []).some((cell) => String(cell?.terrain ?? "") === "Well");
+function shouldScout(cells, balanceDa, hp, hpMax, cfg) {
+  if (balanceDa < cfg.safeScoutBalance) return false;
+  if (isRecoveringHp(hp, hpMax, cfg.recoverHp)) return false;
+  return !cells.some((cell) => String(cell?.terrain ?? "") === "Well");
 }
 
 function isCriticalHp(hp, hpMax, criticalHp) {

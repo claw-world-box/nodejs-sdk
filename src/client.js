@@ -2,7 +2,7 @@ import { ApiPromise, Keyring, WsProvider } from "@polkadot/api";
 import { ScProvider } from "@polkadot/rpc-provider/substrate-connect";
 import { blake2AsU8a } from "@polkadot/util-crypto";
 import { Contract, Interface, JsonRpcProvider, Wallet, WebSocketProvider } from "ethers";
-import { DEFAULT_ALLOWED_ACTIONS, PRECOMPILE_RELATIONS, TERRAIN_NAMES, WEI_PER_AGW } from "./constants.js";
+import { DEFAULT_ALLOWED_ACTIONS, PRECOMPILE_EPOCH, PRECOMPILE_RELATIONS, TERRAIN_NAMES, WEI_PER_AGW } from "./constants.js";
 import { parseAgent, parseCell, parseEpoch, parseMessage, parseRuin } from "./parsers.js";
 import { createAlwaysReadyChecker, createSmoldotBridge } from "./smoldot.js";
 import {
@@ -21,6 +21,9 @@ import { submitAction } from "./actions.js";
 import { RELATIONS_ABI, decodeRelationAttitude, int256LikeToNumber } from "./relations.js";
 
 const DEFAULT_ETH_PRIVATE_KEY = "0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133";
+
+/** Epoch precompile static reads (`agw-game-runtime` `EpochPrecompile`). */
+const EPOCH_VIEW_ABI = ["function getBeaconEntropy() external view returns (uint256)"];
 
 export class AgwGameClient {
   constructor(options = {}) {
@@ -110,6 +113,10 @@ export class AgwGameClient {
     return typeof this.evmRpcUrl === "string" && this.evmRpcUrl.length > 0;
   }
 
+  /**
+   * Static FSM heuristic for prompts/tests — not chain or gateway authority.
+   * For `agw-standalone-api`, use snapshot `fsm_allowed_actions` and `/v1/actions/validate` instead.
+   */
   getAllowedActions(state = null) {
     const actionsByState = {
       Explore: ["move", "harvest", "scout", "broadcast", "renew"],
@@ -413,6 +420,14 @@ export class AgwGameClient {
     const raw = await this.callContract(PRECOMPILE_RELATIONS, RELATIONS_ABI, "getGlobalReputation", [address], {
       send: false
     });
+    return int256LikeToNumber(raw);
+  }
+
+  /** Beacon entropy score from epoch pallet (wei); not the same as `getEpoch()` pool/treasury fields. */
+  async getBeaconEntropy() {
+    this._ensureConnected();
+    if (!this.canUseEvm()) throw new Error("evmRpcUrl is required for getBeaconEntropy");
+    const raw = await this.callContract(PRECOMPILE_EPOCH, EPOCH_VIEW_ABI, "getBeaconEntropy", [], { send: false });
     return int256LikeToNumber(raw);
   }
 

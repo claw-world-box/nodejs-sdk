@@ -16,6 +16,7 @@ Step-by-step action vocabulary, payloads, control loop, and LLM JSON vs tools mo
 - Substrate-first read/write game APIs
 - Optional EVM precompile write path
 - **Optional** read-only **pallet-relations** via precompile `0x504`：`getStanding` / `getRelation` / `getGlobalReputation`, and `readWorld(..., { includeRelations: true })` (requires `evmRpcUrl`; does not change `allowedActions`)
+- **Epoch read**: `getEpoch()` uses Substrate storage; **`epoch.beaconPool` / `epoch.epochTreasury`** 是纪元金库余额（wei 字符串），**不是** Beacon 熵记分。熵需在有 `evmRpcUrl` 时调用 **`getBeaconEntropy()`**（`PRECOMPILE_EPOCH` 只读调用）
 - Built-in rules bundle for strong LLMs
 - Simple autoplay demo for OpenAI-compatible chat models
 
@@ -150,6 +151,14 @@ node ./bin/agw-whitelist-admin.js enable
 ```
 
 `addresses.txt` supports one address per line (lines starting with `#` are ignored) or a JSON array file.
+
+## Snapshot `allowedActions` vs gateway
+
+`readWorld().allowedActions` is derived from a **static FSM table** (`getAllowedActions`) aligned with the prompt-layer FSM in **rust-api-client** `game_prompt_align`, not from chain rules. It does **not** include dynamic extras that **agw-standalone-api** adds to `fsm_allowed_actions` (e.g. structure funding at certain balances). If you use the HTTP gateway, treat **`fsm_allowed_actions`** and **`POST /v1/actions/validate`** as authoritative for what may be submitted.
+
+## Dependency upgrades
+
+Behavior fixes and dependency version bumps are intentionally separate: upgrade `@polkadot/*`, `smoldot`, or `ethers` only on a branch where `npm test` is green, and in small cohorts (transport stack first, then ethers).
 
 ## Notes
 

@@ -141,7 +141,8 @@ await client.connect();
 
 for (;;) {
   const snapshot = await readWorld(client, { radius: 2, agentId: client.agentId });
-  const allowed = snapshot.allowedActions; // 本回合实际可调用子集，优先以它为准
+  // SDK 启发式列表；若使用 agw-standalone-api，请以快照中的 fsm_allowed_actions 与 /v1/actions/validate 为准
+  const allowed = snapshot.allowedActions;
 
   // === 你的 agent：根据 snapshot + allowed 产出 decision ===
   const decision = await yourAgentDecide({ snapshot, allowed });
@@ -160,7 +161,7 @@ for (;;) {
 
 **要点：**
 
-- 每一轮都以 `readWorld` 的 **`allowedActions`** 为硬约束；不要用 `DEFAULT_ALLOWED_ACTIONS` 替代运行时列表（除非你做离线评测且明确知道状态）。
+- `readWorld` 的 **`allowedActions`** 来自 `getAllowedActions(state)`，是**静态 FSM 启发式**，不等同于网关的 **`fsm_allowed_actions`**（后者会按余额、建筑等追加 `fund_structure`、`contribute_beacon` 等）。直连链时可将 `allowedActions` 作提示；接网关时以 **`fsm_allowed_actions`** 与 **`/v1/actions/validate`** 为权威。不要用 `DEFAULT_ALLOWED_ACTIONS` 替代运行时约束（除非离线评测且明确知道状态）。
 - `submitAction` 已内置 `normalizeAction`；模型侧仍建议输出规范名，减少歧义。
 
 ### 3.1 坐标与东南西北（避免模型搞反）
@@ -215,8 +216,8 @@ for (;;) {
 | `logic_shock` | `attack` |
 | `atomic_swap` | `transfer` |
 | `fundstructure` | `fund_structure` |
-| `setstructuremaintenance` | `set_structure_maintenance` |
-| `siegewall` | `siege_wall` |
+| `setstructuremaintenance`, `set_maintenance` | `set_structure_maintenance` |
+| `siegewall`, `siegerwall` | `siege_wall` |
 | `contributebeacon` | `contribute_beacon` |
 | `registershelter` | `register_shelter` |
 

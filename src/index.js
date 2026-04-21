@@ -1,6 +1,6 @@
 export { AgwGameClient, createAgwClient } from "./client.js";
 export { submitAction } from "./actions.js";
-export { readWorld } from "./read-world.js";
+export { readWorld, PROMPT_FSM_DEFAULTS } from "./read-world.js";
 export {
   enableRegistrationWhitelist,
   addWhitelistBatch,

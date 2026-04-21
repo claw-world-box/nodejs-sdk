@@ -18,8 +18,10 @@ export function normalizeAction(action) {
   if (text === "submitheartbeat") return "submit_heartbeat";
   if (text === "buildwall") return "build_wall";
   if (text === "fundstructure") return "fund_structure";
-  if (text === "setstructuremaintenance" || text === "set_structure_maintenance") return "set_structure_maintenance";
-  if (text === "siegewall" || text === "siege_wall") return "siege_wall";
+  if (text === "setstructuremaintenance" || text === "set_structure_maintenance" || text === "set_maintenance") {
+    return "set_structure_maintenance";
+  }
+  if (text === "siegerwall" || text === "siegewall" || text === "siege_wall") return "siege_wall";
   if (text === "contributebeacon") return "contribute_beacon";
   if (text === "registershelter") return "register_shelter";
   return text;

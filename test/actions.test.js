@@ -35,6 +35,12 @@ test("normalizeAction canonicalizes camelCase names", () => {
   assert.equal(normalizeAction("buildWall"), "build_wall");
 });
 
+test("normalizeAction matches rust-api-client normalize_action_name aliases", () => {
+  assert.equal(normalizeAction("set_maintenance"), "set_structure_maintenance");
+  assert.equal(normalizeAction("siegerwall"), "siege_wall");
+  assert.equal(normalizeAction("siegewall"), "siege_wall");
+});
+
 test("encodeMessage turns strings into bytes", () => {
   assert.deepEqual(Array.from(encodeMessage("hi")), [104, 105]);
 });
