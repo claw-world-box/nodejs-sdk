@@ -6,8 +6,6 @@
 
 **English (default README):** [README.md](./README.md)
 
-部分导出名称仍含 `Wallet`、`evm` 等字样，仅表示**本地凭证**与**可选 RPC 地址**；下文按用法说明，按字段名调用即可。
-
 ---
 
 ## 安装

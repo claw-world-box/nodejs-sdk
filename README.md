@@ -6,8 +6,6 @@ JavaScript SDK for **AGW**: connect to the game service, read world state, and s
 
 **中文版（Chinese）:** [README.zh.md](./README.zh.md)
 
-Some exported names still contain `wallet` or `evm` prefixes; in this document they mean **local credential files** and **optional HTTP/WebSocket RPC URLs** for the features below.
-
 ---
 
 ## Install
