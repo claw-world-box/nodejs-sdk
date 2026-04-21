@@ -1,10 +1,9 @@
 /**
- * Thin HTTP client for **agw-standalone-api** Gateway endpoints that require
- * `x-agw-local-agent: 1` and a loopback TCP peer. Use subpath import:
- * `import { StandaloneGatewayClient } from "agw-game-sdk/standalone-gateway"`.
+ * Thin HTTP client for local AGW gateway routes that require `x-agw-local-agent: 1`
+ * and a loopback TCP peer. Subpath import:
+ * `import { StandaloneGatewayClient } from "@clawworld/agw-game-sdk/standalone-gateway"`.
  *
- * Not re-exported from the main package entry — keeps the default SDK surface
- * focused on WS/smoldot + direct chain access.
+ * Not re-exported from the main entry — default surface is WS/smoldot + direct chain access.
  */
 
 const LOCAL_AGENT_HEADER = "x-agw-local-agent";

@@ -21,9 +21,7 @@ import {
 import { submitAction } from "./actions.js";
 import { RELATIONS_ABI, decodeRelationAttitude, int256LikeToNumber } from "./relations.js";
 
-const DEFAULT_ETH_PRIVATE_KEY = "0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133";
-
-/** Epoch precompile static reads (`agw-game-runtime` `EpochPrecompile`). */
+/** Epoch precompile static reads (address `0x502`). */
 const EPOCH_VIEW_ABI = ["function getBeaconEntropy() external view returns (uint256)"];
 
 export class AgwGameClient {
@@ -38,7 +36,7 @@ export class AgwGameClient {
     this.smoldotBootnodes = normalizeBootnodes(options.smoldotBootnodes ?? "");
     this.smoldotConfig = options.smoldotConfig ?? {};
     this.signerUri = options.signerUri ?? null;
-    this.ethPrivateKey = options.ethPrivateKey ?? DEFAULT_ETH_PRIVATE_KEY;
+    this.ethPrivateKey = options.ethPrivateKey ?? null;
     this.mapWidth = clampPositiveInt(options.mapWidth ?? 256, 256);
     this.mapHeight = clampPositiveInt(options.mapHeight ?? 256, 256);
     this.agentId = options.agentId ?? null;
@@ -60,9 +58,6 @@ export class AgwGameClient {
       this.provider = new ScProvider(createSmoldotBridge(), chainSpec);
       await this.provider.connect(this.smoldotConfig, createAlwaysReadyChecker);
       this.api = await ApiPromise.create({ provider: this.provider });
-    }
-    if (!this.signer) {
-      this.signer = this._buildDefaultSigner();
     }
     const unitWei = this.api.consts?.action?.unitWei;
     if (unitWei !== undefined && unitWei !== null) {
@@ -115,8 +110,8 @@ export class AgwGameClient {
   }
 
   /**
-   * Static FSM heuristic for prompts/tests — not chain or gateway authority.
-   * For `agw-standalone-api`, use snapshot `fsm_allowed_actions` and `/v1/actions/validate` instead.
+   * Static FSM heuristic for prompts — not on-chain or gateway authority.
+   * If you use an AGW HTTP gateway, treat its allowed-actions list and validation API as authoritative.
    */
   getAllowedActions(state = null) {
     const actionsByState = {
@@ -450,12 +445,23 @@ export class AgwGameClient {
     if (!this.api) throw new Error("client not connected, call connect() first");
   }
 
+  _ensureSigner() {
+    if (this.signer) return;
+    this.signer = this._buildDefaultSigner();
+  }
+
   _buildDefaultSigner() {
     const accountIdLen = this.api.registry.createType("AccountId").toU8a().length;
     if (accountIdLen === 20) {
+      if (!this.signerUri && !this.ethPrivateKey) {
+        throw new Error("signerUri or ethPrivateKey is required for Ethereum account chains");
+      }
       return new Keyring({ type: "ethereum" }).addFromUri(this.signerUri ?? this.ethPrivateKey);
     }
-    return new Keyring({ type: "sr25519" }).addFromUri(this.signerUri ?? "//Alice");
+    if (!this.signerUri) {
+      throw new Error("signerUri is required for Sr25519 signing (set signerUri or pass signer in constructor)");
+    }
+    return new Keyring({ type: "sr25519" }).addFromUri(this.signerUri);
   }
 
   _findCall(section, candidates) {
@@ -530,6 +536,9 @@ export class AgwGameClient {
   }
 
   _getEvmSigner() {
+    if (!this.ethPrivateKey) {
+      throw new Error("ethPrivateKey is required for EVM signing");
+    }
     if (!this._evmSigner) {
       this._evmSigner = new Wallet(this.ethPrivateKey, this._getEvmProvider());
     }
@@ -537,6 +546,7 @@ export class AgwGameClient {
   }
 
   async _submit(tx) {
+    this._ensureSigner();
     return new Promise((resolve, reject) => {
       let unsub = null;
       tx.signAndSend(this.signer, (result) => {

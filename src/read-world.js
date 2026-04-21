@@ -3,7 +3,7 @@ import { parseCell, parseEpoch, parseRuin } from "./parsers.js";
 import { normalizeOwnerToAddress } from "./relations.js";
 import { DIRECTION_DELTAS, legalDirectionsFromGridPosition, toBigInt } from "./utils.js";
 
-/** Matches `rust-api-client` `game_prompt_align::PromptFsmConfig::default()` (thresholds only). */
+/** Default thresholds for the prompt-layer FSM heuristic (aligned with gateway snapshots). */
 export const PROMPT_FSM_DEFAULTS = Object.freeze({
   criticalEnergy: 150,
   criticalExitEnergy: 200,
@@ -33,7 +33,7 @@ function setPreviousFsm(client, agentId, state) {
   getFsmPrevMap(client).set(Number(agentId), state);
 }
 
-/** Native wei to whole-token units, matching `chain.rs` `WEI_PER_DA` / balance_da. */
+/** Native wei balance to whole-token units (18 decimals). */
 function balanceDaFromMe(me) {
   if (!me) return 0;
   const wei = toBigInt(me.nativeBalance ?? me.balanceWei ?? 0);
@@ -52,9 +52,9 @@ function mergeFsmConfig(config) {
 }
 
 /**
- * Mirrors `game_prompt_align::nearest_other_agent_distance`: center cell with >1 occupant => 0;
- * else minimum Manhattan distance to a cell with occupants > 0 and distance >= 1.
- * Falls back to `agents[].distance` when cells do not expose `occupants` (excludes `viewerAgentId`, e.g. `getNearbyAgents` includes self at distance 0).
+ * Nearest other agent by Manhattan distance: center cell with >1 occupant => 0;
+ * else minimum distance to a cell with occupants > 0 and distance >= 1.
+ * Falls back to `agents[].distance` when cells omit `occupants` (excludes `viewerAgentId`; `getNearbyAgents` includes self at distance 0).
  */
 export function nearestOtherAgentDistance(cells, cx, cy, fallbackAgents, viewerAgentId) {
   const center = cells.find((c) => Number(c.x) === cx && Number(c.y) === cy);

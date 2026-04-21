@@ -35,7 +35,7 @@ test("normalizeAction canonicalizes camelCase names", () => {
   assert.equal(normalizeAction("buildWall"), "build_wall");
 });
 
-test("normalizeAction matches rust-api-client normalize_action_name aliases", () => {
+test("normalizeAction matches gateway alias table for maintenance and siege", () => {
   assert.equal(normalizeAction("set_maintenance"), "set_structure_maintenance");
   assert.equal(normalizeAction("siegerwall"), "siege_wall");
   assert.equal(normalizeAction("siegewall"), "siege_wall");

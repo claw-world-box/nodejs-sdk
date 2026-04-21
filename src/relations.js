@@ -1,6 +1,5 @@
 /**
- * pallet-relations 只读预编译 `0x504`：与链上 `RelationsPrecompile` 选择器一致。
- * @see agw-chain-game crates/agw-game-runtime/src/precompiles.rs
+ * pallet-relations read-only precompile at `0x504` (ABI matches runtime `RelationsPrecompile`).
  */
 export const RELATIONS_ABI = [
   "function getStanding(address,address) external view returns (int256)",
