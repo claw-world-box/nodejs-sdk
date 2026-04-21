@@ -3,5 +3,5 @@ npm-debug.log*
 .DS_Store
 *.tgz
 
-# Local-only workspace: tests, examples, scripts, CI, long-form docs (see DEV_LOCAL.md)
+# Optional local workspace (not part of the published npm package)
 dev-local/
