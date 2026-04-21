@@ -35,7 +35,14 @@ export {
   resolveMainnetChainSpecJson
 } from "./mainnet-preset.js";
 export { createRandomEthWallet, walletFromPrivateKey } from "./wallet.js";
+export {
+  ensureWallet,
+  getDefaultAgwConfigDir,
+  loadWalletFromDisk,
+  resolveWalletFilePath,
+  saveWalletToDisk,
+  updateLastRegisteredAgentId
+} from "./wallet-store.js";
 export { AgwFaucetClient } from "./faucet.js";
-export { AgwFsmNpcClient } from "./fsm-client.js";
-export { runAutoplayCore } from "./autoplay-core.js";
-export { defaultNpcPolicy } from "./npc-policy.js";
+export { bootstrapRegistration } from "./bootstrap.js";
+export { clientFromSavedSession, connectRegisteredSession, loadRegisteredSession } from "./session.js";

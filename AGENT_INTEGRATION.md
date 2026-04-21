@@ -8,10 +8,13 @@
 
 | 能力 | 入口 | 说明 |
 |------|------|------|
+| **一键注册宏（推荐）** | `bootstrapRegistration` | 生成或加载落盘钱包 → 领水 → `connect` → `registerWithRandomSpawn`，并写回 `lastRegisteredAgentId`；详见 README **Quickstart** |
+| 钱包落盘 / 恢复 | `ensureWallet` / `saveWalletToDisk` / `loadWalletFromDisk`（`agw-game-sdk` 或 `agw-game-sdk/wallet-store`） | 默认目录见 `getDefaultAgwConfigDir()`；JSON 含 `address`、`privateKey`、`lastRegisteredAgentId`、`networkPreset` 等 |
+| 已注册会话恢复 | `loadRegisteredSession` / `connectRegisteredSession` / `clientFromSavedSession`（`agw-game-sdk/session`） | 后续自动操作只需从磁盘恢复 `wallet` + `agentId` 再建 `AgwGameClient` |
 | 连接链 | `AgwGameClient` / `createAgwClient` | `connectionMode`: `ws` 或 `smoldot`；主网默认 `networkPreset: "mainnet"` 时 **内嵌** chain spec + bootnode（包内 `assets/mainnet-chain-spec-raw.json`），无需自填 spec，除非 `networkPreset: "none"` 并自行提供 `smoldotChainSpec` / URL |
 | 领水（直连水龙头 HTTP） | `AgwFaucetClient` | `POST {base}/claim`，头 **`X-Faucet-Api-Key`**，体 `{ address }`；默认基址与 Rust `embed-mainnet-defaults` 对齐，**不**经过本地 `agw-standalone-api` |
 | ETH 密钥 | `createRandomEthWallet` / `walletFromPrivateKey` | 基于 `ethers`，主入口导出；与 Gateway `ethKeygen` 二选一 |
-| NPC 规则循环 | `AgwFsmNpcClient` / `runAutoplayCore` / `defaultNpcPolicy` | 不依赖 LLM：按 `readWorld` 的 **`fsmAllowedActions`** 选动作并 `submitAction` |
+| NPC 规则循环 | `import { AgwFsmNpcClient, ... } from "agw-game-sdk/fsm-client"` | **主入口不导出** FSM/NPC；不依赖 LLM：按 `readWorld` 的 **`fsmAllowedActions`** 选动作并 `submitAction` |
 | 读世界快照 | `readWorld(client, input)` | 聚合 `me`、**`navigation`**、周边格、附近 agent、消息、遗迹、epoch、**`fsmState` / `fsmAllowedActions` / `fsmConfig`**，以及兼容字段 **`state` / `allowedActions`**（与 `fsm*` 同值）；可选 `includeRelations: true` 时附加 **pallet-relations**（需 EVM） |
 | Relations 只读（链上 `0x504`） | `getStanding` / `getRelation` / `getGlobalReputation` | 与 `PRECOMPILE_RELATIONS` 对齐；**不**作为 `allowedActions` 或动作合法性的硬约束（与 `rules` 中 heal/transfer 等表述一致） |
 | 提交动作 | `submitAction(client, { action, agentId, payload, path? })` | 自动选 EVM 预编译或 Substrate（`path: "evm" \| "substrate" \| "auto"`） |

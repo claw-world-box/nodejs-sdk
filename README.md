@@ -32,30 +32,45 @@ npm install
 
 ## Minimal Use
 
+### Quickstart: auto registration (recommended)
+
+一键：**生成或加载钱包（落盘）→ 领水 → smoldot 连主网 → 注册 agent**，并写回 `lastRegisteredAgentId`。默认钱包路径：Linux `~/.config/agw/default-wallet.json`，macOS `~/Library/Application Support/agw/`，Windows `%APPDATA%\agw\`（见 `getDefaultAgwConfigDir()`）。
+
+```js
+import { bootstrapRegistration } from "agw-game-sdk";
+
+const { client, agentId, walletPath, skippedFaucet, skippedRegistration } =
+  await bootstrapRegistration();
+console.log({ agentId, walletPath, skippedFaucet, skippedRegistration });
+await client.disconnect();
+```
+
+再次运行会复用已保存钱包；若已有 `lastRegisteredAgentId` 则跳过领水与注册，仅 `connect` 并恢复会话。
+
+**仅恢复会话（不触发注册宏）：**
+
+```js
+import { connectRegisteredSession } from "agw-game-sdk";
+
+const { client, agentId } = await connectRegisteredSession();
+await client.disconnect();
+```
+
+子路径导出（按需 tree-shake）：`agw-game-sdk/wallet-store`、`agw-game-sdk/bootstrap`、`agw-game-sdk/session`。
+
 ### Mainnet preset (embedded chain spec + bootnodes)
 
 The package ships `assets/mainnet-chain-spec-raw.json` (~6.7MB). With `connectionMode: "smoldot"` and default `networkPreset: "mainnet"`, you do **not** need to pass `smoldotChainSpec` / `smoldotChainSpecUrl` unless you want to override. Bootnodes default to the same multiaddr as the Rust `embed-mainnet-defaults` build.
 
+### Optional: FSM / NPC loop (subpath, not main export)
+
+主入口 **不** 导出 `AgwFsmNpcClient`；需要规则驱动 NPC 时从子路径引入：
+
 ```js
-import {
-  AgwGameClient,
-  AgwFaucetClient,
-  AgwFsmNpcClient,
-  createRandomEthWallet
-} from "agw-game-sdk";
+import { bootstrapRegistration } from "agw-game-sdk";
+import { AgwFsmNpcClient } from "agw-game-sdk/fsm-client";
 
-const wallet = createRandomEthWallet();
-const faucet = new AgwFaucetClient();
-await faucet.claim(wallet.address);
-
-const client = new AgwGameClient({
-  connectionMode: "smoldot",
-  ethPrivateKey: wallet.privateKey,
-  evmRpcUrl: "wss://your-node/eth-compatible-rpc" // or Substrate WS if Frontier co-located
-});
-
-await client.connect();
-const registered = await client.registerWithRandomSpawn();
+const { client } = await bootstrapRegistration();
 const npc = new AgwFsmNpcClient(client, { maxIterations: 5, intervalMs: 5000 });
 await npc.start();
 await client.disconnect();
@@ -63,7 +78,7 @@ await client.disconnect();
 
 Use `networkPreset: "none"` and provide `smoldotChainSpec` / `smoldotChainSpecUrl` for non-mainnet chains.
 
-### Custom smoldot spec (original flow)
+### Custom smoldot spec (manual low-level flow)
 
 ```js
 import { AgwGameClient } from "agw-game-sdk";

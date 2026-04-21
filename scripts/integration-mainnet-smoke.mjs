@@ -1,81 +1,39 @@
 #!/usr/bin/env node
 /**
- * Joint smoke test: SDK defaults → smoldot mainnet → wallet → faucet → register → NPC ticks.
- * No env vars required (optional AGW_NPC_TICKS to override tick count).
+ * Joint smoke: `bootstrapRegistration` → optional NPC ticks (import from `agw-game-sdk/fsm-client`).
+ * Uses an isolated temp wallet dir unless `AGW_WALLET_DIR` is set.
  */
-import {
-  AgwFsmNpcClient,
-  AgwGameClient,
-  AgwFaucetClient,
-  createRandomEthWallet
-} from "../src/index.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { bootstrapRegistration } from "../src/index.js";
+import { AgwFsmNpcClient } from "../src/fsm-client.js";
 
 const ticks = Math.max(1, Math.min(20, Number(process.env.AGW_NPC_TICKS ?? 4) || 4));
 const intervalMs = Number(process.env.AGW_NPC_INTERVAL_MS ?? 3000);
 
-console.log("[1/6] createRandomEthWallet");
-const wallet = createRandomEthWallet();
-console.log("      address", wallet.address);
+const walletDir = process.env.AGW_WALLET_DIR ?? mkdtempSync(join(tmpdir(), "agw-smoke-"));
+const walletFileName = process.env.AGW_WALLET_FILE ?? "smoke-wallet.json";
 
-console.log("[2/6] faucet claim");
-const faucet = new AgwFaucetClient();
-let claimOut;
-try {
-  claimOut = await faucet.claim(wallet.address);
-  console.log("      claim ok", JSON.stringify(claimOut).slice(0, 200));
-} catch (e) {
-  console.error("      FATAL faucet:", e?.message ?? e);
-  process.exit(2);
-}
+console.log("[bootstrap] wallet dir", walletDir, "file", walletFileName);
 
-console.log("[3/6] AgwGameClient (defaults: smoldot + networkPreset mainnet, no spec)");
-const client = new AgwGameClient({
-  ethPrivateKey: wallet.privateKey
+const out = await bootstrapRegistration({
+  configDir: walletDir,
+  walletFileName,
+  registerOptions: { maxAttempts: 50 }
 });
 
-console.log("[4/6] connect() — smoldot may take 1–5+ minutes first sync…");
-const t0 = Date.now();
-try {
-  await client.connect();
-  console.log("      connected in", Math.round((Date.now() - t0) / 1000), "s");
-} catch (e) {
-  console.error("      FATAL connect:", e?.message ?? e);
-  process.exit(3);
-}
+console.log("[bootstrap] agentId", out.agentId, "walletPath", out.walletPath, "skippedFaucet", out.skippedFaucet);
 
-console.log("[5/6] registerWithRandomSpawn");
-let reg;
-try {
-  reg = await client.registerWithRandomSpawn();
-  console.log("      agentId", reg.agentId, "position", reg.position);
-} catch (e) {
-  console.error("      FATAL register:", e?.message ?? e);
-  await client.disconnect().catch(() => {});
-  process.exit(4);
-}
-
-console.log("[6/6] AgwFsmNpcClient", ticks, "ticks interval", intervalMs, "ms");
-const npc = new AgwFsmNpcClient(client, {
-  maxIterations: ticks,
+const npc = new AgwFsmNpcClient(out.client, {
   intervalMs,
+  maxIterations: ticks,
   onStep: (s) => {
-    console.log(
- "      tick",
-      s.iteration,
-      "action",
-      s.decision?.action,
-      "ok",
-      s.recentResult?.ok
-    );
+    console.log("tick", s.iteration, s.decision?.action, s.recentResult?.ok);
   },
-  onError: (e) => console.error("      step error", e?.message ?? e)
+  onError: (e) => console.error("npc error", e)
 });
 
-try {
-  await npc.start();
-} catch (e) {
-  console.error("      FATAL npc:", e?.message ?? e);
-}
-
-await client.disconnect().catch(() => {});
+await npc.start();
+await out.client.disconnect();
 console.log("done.");
