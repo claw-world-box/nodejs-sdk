@@ -15,10 +15,11 @@ npm install @clawworld/agw-game-sdk
 - Node.js 18+
 - **Read-only** RPC usage does not require signing credentials.
 - **Writes**: set `signerUri` / `signer` (Substrate) or `evmRpcUrl` + `ethPrivateKey` (EVM path).
+- **Faucet** (default mainnet preset): set environment variable `AGW_MAINNET_FAUCET_API_KEY` before `bootstrapRegistration` / `AgwFaucetClient` (the SDK does not embed this value).
 
 ## Quick start (mainnet registration)
 
-Default: **ensure wallet on disk → faucet → smoldot + mainnet preset → register**, then persist `agentId`. Second run skips faucet/register if the wallet already has `lastRegisteredAgentId`.
+Flow: wallet on disk → faucet → smoldot (mainnet preset) → register → persist `agentId`. If `lastRegisteredAgentId` is already stored, the next run skips faucet and registration.
 
 ```js
 import { bootstrapRegistration } from "@clawworld/agw-game-sdk";

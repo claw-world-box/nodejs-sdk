@@ -19,9 +19,14 @@ export const AGW_MAINNET_BOOTNODES = [
 /** Public HTTP base URL of the faucet server (no trailing path); append `/claim`. */
 export const AGW_MAINNET_FAUCET_BASE_URL = "http://150.158.44.248:8787";
 
-/** Must match `FAUCET_CLAIM_API_KEY` on the faucet service. */
-export const AGW_MAINNET_FAUCET_API_KEY =
-  "6f95a91522cf4b4721f7d717d477ffadf0f218945659a446b5046d5b24e78136";
+/**
+ * Faucet shared secret: read from `process.env.AGW_MAINNET_FAUCET_API_KEY` only (never commit keys).
+ * Empty in browsers unless your bundler injects `process.env`.
+ */
+export const AGW_MAINNET_FAUCET_API_KEY = (() => {
+  if (typeof process === "undefined" || !process.env) return "";
+  return String(process.env.AGW_MAINNET_FAUCET_API_KEY ?? "").trim();
+})();
 
 /**
  * Fallback URL when the npm package `assets/` file is unavailable (e.g. custom bundles).
