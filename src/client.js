@@ -15,7 +15,8 @@ import {
   structureKindToU8,
   toBigInt,
   toNumber,
-  tupleToPair
+  tupleToPair,
+  uint256LikeToBigInt
 } from "./utils.js";
 import { submitAction } from "./actions.js";
 import { RELATIONS_ABI, decodeRelationAttitude, int256LikeToNumber } from "./relations.js";
@@ -423,12 +424,15 @@ export class AgwGameClient {
     return int256LikeToNumber(raw);
   }
 
-  /** Beacon entropy score from epoch pallet (wei); not the same as `getEpoch()` pool/treasury fields. */
+  /**
+   * Beacon entropy from epoch pallet (wei, u128-backed on chain). Not the same as `getEpoch()` pool/treasury fields.
+   * @returns {Promise<bigint>} full uint256; do not use `int256LikeToNumber` (lossy for large values).
+   */
   async getBeaconEntropy() {
     this._ensureConnected();
     if (!this.canUseEvm()) throw new Error("evmRpcUrl is required for getBeaconEntropy");
     const raw = await this.callContract(PRECOMPILE_EPOCH, EPOCH_VIEW_ABI, "getBeaconEntropy", [], { send: false });
-    return int256LikeToNumber(raw);
+    return uint256LikeToBigInt(raw);
   }
 
   async getCurrentBlockNumber() {

@@ -16,7 +16,7 @@ Step-by-step action vocabulary, payloads, control loop, and LLM JSON vs tools mo
 - Substrate-first read/write game APIs
 - Optional EVM precompile write path
 - **Optional** read-only **pallet-relations** via precompile `0x504`：`getStanding` / `getRelation` / `getGlobalReputation`, and `readWorld(..., { includeRelations: true })` (requires `evmRpcUrl`; does not change `allowedActions`)
-- **Epoch read**: `getEpoch()` uses Substrate storage; **`epoch.beaconPool` / `epoch.epochTreasury`** 是纪元金库余额（wei 字符串），**不是** Beacon 熵记分。熵需在有 `evmRpcUrl` 时调用 **`getBeaconEntropy()`**（`PRECOMPILE_EPOCH` 只读调用）
+- **Epoch read**: `getEpoch()` uses Substrate storage; **`epoch.beaconPool` / `epoch.epochTreasury`** 是纪元金库余额（wei 字符串），**不是** Beacon 熵记分。熵需在有 `evmRpcUrl` 时调用 **`getBeaconEntropy()`**（`PRECOMPILE_EPOCH` 只读调用，返回 **`bigint` wei**，完整 `uint256`、不做 i32 截断）
 - Built-in rules bundle for strong LLMs
 - Simple autoplay demo for OpenAI-compatible chat models
 
@@ -75,6 +75,7 @@ Main entry:
 
 - `AgwGameClient`
 - `createAgwClient`
+- `PROMPT_FSM_DEFAULTS`
 - `submitAction`
 - `readWorld`
 - `enableRegistrationWhitelist`

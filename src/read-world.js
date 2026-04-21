@@ -54,9 +54,9 @@ function mergeFsmConfig(config) {
 /**
  * Mirrors `game_prompt_align::nearest_other_agent_distance`: center cell with >1 occupant => 0;
  * else minimum Manhattan distance to a cell with occupants > 0 and distance >= 1.
- * Falls back to `agents[].distance` when cells do not expose `occupants`.
+ * Falls back to `agents[].distance` when cells do not expose `occupants` (excludes `viewerAgentId`, e.g. `getNearbyAgents` includes self at distance 0).
  */
-export function nearestOtherAgentDistance(cells, cx, cy, fallbackAgents) {
+export function nearestOtherAgentDistance(cells, cx, cy, fallbackAgents, viewerAgentId) {
   const center = cells.find((c) => Number(c.x) === cx && Number(c.y) === cy);
   const centerOcc =
     center && center.occupants != null && center.occupants !== undefined
@@ -79,7 +79,12 @@ export function nearestOtherAgentDistance(cells, cx, cy, fallbackAgents) {
   }
 
   if (!Array.isArray(fallbackAgents) || fallbackAgents.length === 0) return Infinity;
-  return Math.min(...fallbackAgents.map((a) => Number(a.distance ?? 99)));
+  const filtered =
+    viewerAgentId == null
+      ? fallbackAgents
+      : fallbackAgents.filter((a) => Number(a.id) !== Number(viewerAgentId));
+  if (filtered.length === 0) return Infinity;
+  return Math.min(...filtered.map((a) => Number(a.distance ?? 99)));
 }
 
 async function buildRelationsSnapshot(client, me, agents) {
@@ -246,7 +251,7 @@ function evaluateState(snapshot) {
     return "Recover";
   }
 
-  const nearest = nearestOtherAgentDistance(cells, cx, cy, snapshot?.agents ?? []);
+  const nearest = nearestOtherAgentDistance(cells, cx, cy, snapshot?.agents ?? [], me?.id);
 
   if (nearest <= 1) return "Combat";
   if (nearest <= cfg.encounterDistance) return "Encounter";

@@ -31,5 +31,14 @@ test("getBeaconEntropy returns decoded uint256 from callContract", async () => {
   client.api = {};
   client.callContract = async () => 12_345n;
   const v = await client.getBeaconEntropy();
-  assert.equal(v, 12_345);
+  assert.equal(v, 12_345n);
+});
+
+test("getBeaconEntropy round-trips uint256 above i32 range", async () => {
+  const { AgwGameClient } = await import("../src/client.js");
+  const client = new AgwGameClient({ wsUrl: "ws://127.0.0.1:9944", evmRpcUrl: "http://127.0.0.1:9933" });
+  client.api = {};
+  client.callContract = async () => 5_000_000_000n;
+  const v = await client.getBeaconEntropy();
+  assert.equal(v, 5_000_000_000n);
 });

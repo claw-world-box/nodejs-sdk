@@ -335,7 +335,7 @@ test("readWorld Combat when center cell has multiple occupants", async () => {
   assert.equal(snap.state, "Combat");
 });
 
-test("readWorld falls back to agent distances when cells omit occupants", async () => {
+test("readWorld fallback excludes self like AgwGameClient.getNearbyAgents (self d0 + other d2 => Encounter)", async () => {
   const client = minimalClient({
     async getAgent(id) {
       return baseAgent({ id, nativeBalance: 200n * WEI_PER_AGW });
@@ -344,7 +344,44 @@ test("readWorld falls back to agent distances when cells omit occupants", async 
       return [{ x: 5, y: 5, terrain: "Plain" }];
     },
     async getNearbyAgents() {
-      return [{ ...baseAgent({ id: 2, position: { x: 6, y: 5 }, nativeBalance: 50n * WEI_PER_AGW }), distance: 1 }];
+      return [
+        { ...baseAgent({ id: 1 }), distance: 0 },
+        {
+          ...baseAgent({ id: 2, position: { x: 7, y: 5 }, nativeBalance: 50n * WEI_PER_AGW }),
+          distance: 2
+        }
+      ];
+    },
+    async getRecentMessages() {
+      return [];
+    },
+    async getEpoch() {
+      return { index: 0, beaconPool: "0", beaconTarget: "0", startBlock: 0 };
+    },
+    async getCurrentBlockNumber() {
+      return 100;
+    }
+  });
+  const snap = await readWorld(client, { agentId: 1 });
+  assert.equal(snap.state, "Encounter");
+});
+
+test("readWorld fallback Combat when nearest other agent is adjacent", async () => {
+  const client = minimalClient({
+    async getAgent(id) {
+      return baseAgent({ id, nativeBalance: 200n * WEI_PER_AGW });
+    },
+    async watchSurroundings() {
+      return [{ x: 5, y: 5, terrain: "Plain" }];
+    },
+    async getNearbyAgents() {
+      return [
+        { ...baseAgent({ id: 1 }), distance: 0 },
+        {
+          ...baseAgent({ id: 2, position: { x: 6, y: 5 }, nativeBalance: 50n * WEI_PER_AGW }),
+          distance: 1
+        }
+      ];
     },
     async getRecentMessages() {
       return [];

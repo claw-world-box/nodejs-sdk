@@ -71,6 +71,17 @@ export function toBigInt(value) {
   return 0n;
 }
 
+/**
+ * uint256 / u128 from EVM `view`/`pure` returns (e.g. epoch precompile). No i32-style truncation.
+ * @param {bigint|number|string|unknown} value
+ * @returns {bigint}
+ */
+export function uint256LikeToBigInt(value) {
+  if (typeof value === "bigint") return value;
+  if (value == null) return 0n;
+  return BigInt(String(value));
+}
+
 export function toNumber(value) {
   if (typeof value === "number") return value;
   if (typeof value === "bigint") return Number(value);
