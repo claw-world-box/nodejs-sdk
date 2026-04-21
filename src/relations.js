@@ -8,8 +8,8 @@ export const RELATIONS_ABI = [
 ];
 
 /**
- * 将 `owner` 规范为 EVM `address`（H160）。仅接受 `0x` + 40 位 hex。
- * @returns {string|null} 小写 `0x...` 或无法解析时为 `null`
+ * Normalize `owner` to an EVM `address` (H160). Only accepts `0x` + 40 hex chars.
+ * @returns {string|null} Lowercase `0x...`, or `null` if invalid.
  */
 export function normalizeOwnerToAddress(owner) {
   if (owner == null) return null;
@@ -19,7 +19,7 @@ export function normalizeOwnerToAddress(owner) {
 }
 
 /**
- * 预编译 `getRelation` 返回值：0 Neutral / 1 Allied / 2 Hostile
+ * Decode `getRelation` precompile result: 0 Neutral / 1 Allied / 2 Hostile.
  */
 export function decodeRelationAttitude(n) {
   const v = Number(typeof n === "bigint" ? n : BigInt(String(n)));
@@ -30,7 +30,7 @@ export function decodeRelationAttitude(n) {
 }
 
 /**
- * 将 `int256` 解码结果（bigint/number）转为与链上 `i32` 一致的 number。
+ * Coerce an `int256`-like value (bigint/number) to a JS number matching on-chain `i32` semantics.
  */
 export function int256LikeToNumber(value) {
   const x = BigInt(typeof value === "bigint" ? value : String(value));
