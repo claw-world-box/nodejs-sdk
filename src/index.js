@@ -24,3 +24,18 @@ export {
 } from "./relations.js";
 export { normalizeAction, encodeMessage } from "./utils.js";
 export { parseAgent, parseCell, parseEpoch, parseRuin } from "./parsers.js";
+export { getFsmAllowedActionsForState } from "./fsm.js";
+export {
+  AGW_MAINNET_BOOTNODES,
+  AGW_MAINNET_CHAIN_SPEC_FETCH_URL,
+  AGW_MAINNET_FAUCET_API_KEY,
+  AGW_MAINNET_FAUCET_BASE_URL,
+  loadMainnetChainSpecJsonSync,
+  mainnetPreset,
+  resolveMainnetChainSpecJson
+} from "./mainnet-preset.js";
+export { createRandomEthWallet, walletFromPrivateKey } from "./wallet.js";
+export { AgwFaucetClient } from "./faucet.js";
+export { AgwFsmNpcClient } from "./fsm-client.js";
+export { runAutoplayCore } from "./autoplay-core.js";
+export { defaultNpcPolicy } from "./npc-policy.js";

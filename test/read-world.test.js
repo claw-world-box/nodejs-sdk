@@ -78,7 +78,9 @@ test("readWorld includeRelations adds snapshot when EVM and mocks succeed", asyn
   const client = {
     ...minimalClient({
       async getAgent(id) {
-        if (id === 1) return baseAgent({ id: 1 });
+        if (id === 1) {
+          return baseAgent({ id: 1, nativeBalance: 200n * WEI_PER_AGW, energy: "200" });
+        }
         return baseAgent({
           id: 2,
           owner: addr2,
@@ -89,11 +91,12 @@ test("readWorld includeRelations adds snapshot when EVM and mocks succeed", asyn
         });
       },
       async watchSurroundings() {
-        return [{ x: 5, y: 5, terrain: "Plain", occupants: 0 }];
+        // Omit `occupants` so nearestOtherAgentDistance uses agents[] fallback (see read-world.js).
+        return [{ x: 5, y: 5, terrain: "Plain" }];
       },
       async getNearbyAgents() {
         return [
-          { ...baseAgent({ id: 1 }), distance: 0 },
+          { ...baseAgent({ id: 1, nativeBalance: 200n * WEI_PER_AGW, energy: "200" }), distance: 0 },
           {
             ...baseAgent({ id: 2, owner: addr2, position: { x: 6, y: 5 }, hp: 50, hpMax: 50, energy: "50" }),
             distance: 1
@@ -132,7 +135,9 @@ test("readWorld includeRelations adds snapshot when EVM and mocks succeed", asyn
   assert.equal(gr, 1);
   assert.equal(st, 1);
   assert.equal(rel, 1);
-  assert.deepEqual(snap.allowedActions, ["move", "harvest"]);
+  assert.equal(snap.fsmState, "Combat");
+  assert.deepEqual(snap.allowedActions, snap.fsmAllowedActions);
+  assert.deepEqual(snap.allowedActions, ["attack", "heal", "move", "broadcast", "transfer"]);
 });
 
 test("readWorld includeRelations keeps partial peers when one peer lookup throws", async () => {

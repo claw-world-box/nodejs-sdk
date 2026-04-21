@@ -1,4 +1,5 @@
 import { WEI_PER_AGW } from "./constants.js";
+import { getFsmAllowedActionsForState } from "./fsm.js";
 import { parseCell, parseEpoch, parseRuin } from "./parsers.js";
 import { normalizeOwnerToAddress } from "./relations.js";
 import { DIRECTION_DELTAS, legalDirectionsFromGridPosition, toBigInt } from "./utils.js";
@@ -185,6 +186,7 @@ export async function readWorld(client, input = {}) {
 
   const epoch = parseEpoch(await client.getEpoch());
   const previousFsm = getPreviousFsm(client, agentId);
+  const fsmConfig = mergeFsmConfig(input.config ?? {});
   const state = evaluateState({
     me: agent,
     cells,
@@ -197,6 +199,8 @@ export async function readWorld(client, input = {}) {
   });
   setPreviousFsm(client, agentId, state);
 
+  const fsmAllowedActions = getFsmAllowedActionsForState(state);
+
   const navigation = buildNavigationContext(client, agent.position);
   const snapshot = {
     blockNumber: await client.getCurrentBlockNumber(),
@@ -208,7 +212,10 @@ export async function readWorld(client, input = {}) {
     ruins,
     epoch,
     state,
-    allowedActions: client.getAllowedActions(state),
+    fsmState: state,
+    fsmConfig,
+    fsmAllowedActions,
+    allowedActions: fsmAllowedActions,
     perception: {
       nearbyAgents: agents,
       nearbyCells: cells.map((cell) => parseCell(cell.x, cell.y, cell, cell)),

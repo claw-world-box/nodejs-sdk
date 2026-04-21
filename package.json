@@ -1,6 +1,6 @@
 {
   "name": "agw-game-sdk",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Pure JS AGW game client SDK with browser-friendly chain access and LLM autoplay demo",
   "repository": {
     "type": "git",
@@ -13,6 +13,7 @@
   "main": "./src/index.js",
   "files": [
     "src",
+    "assets",
     "rules",
     "bin",
     "README.md",
@@ -23,7 +24,11 @@
     "./rules": "./rules/index.js",
     "./llm": "./src/llm/index.js",
     "./eval": "./src/eval.js",
-    "./standalone-gateway": "./src/standalone-gateway.js"
+    "./standalone-gateway": "./src/standalone-gateway.js",
+    "./mainnet-preset": "./src/mainnet-preset.js",
+    "./wallet": "./src/wallet.js",
+    "./faucet": "./src/faucet.js",
+    "./fsm-client": "./src/fsm-client.js"
   },
   "bin": {
     "agw-llm-demo": "bin/agw-llm-demo.js",

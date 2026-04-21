@@ -32,11 +32,45 @@ npm install
 
 ## Minimal Use
 
+### Mainnet preset (embedded chain spec + bootnodes)
+
+The package ships `assets/mainnet-chain-spec-raw.json` (~6.7MB). With `connectionMode: "smoldot"` and default `networkPreset: "mainnet"`, you do **not** need to pass `smoldotChainSpec` / `smoldotChainSpecUrl` unless you want to override. Bootnodes default to the same multiaddr as the Rust `embed-mainnet-defaults` build.
+
+```js
+import {
+  AgwGameClient,
+  AgwFaucetClient,
+  AgwFsmNpcClient,
+  createRandomEthWallet
+} from "agw-game-sdk";
+
+const wallet = createRandomEthWallet();
+const faucet = new AgwFaucetClient();
+await faucet.claim(wallet.address);
+
+const client = new AgwGameClient({
+  connectionMode: "smoldot",
+  ethPrivateKey: wallet.privateKey,
+  evmRpcUrl: "wss://your-node/eth-compatible-rpc" // or Substrate WS if Frontier co-located
+});
+
+await client.connect();
+const registered = await client.registerWithRandomSpawn();
+const npc = new AgwFsmNpcClient(client, { maxIterations: 5, intervalMs: 5000 });
+await npc.start();
+await client.disconnect();
+```
+
+Use `networkPreset: "none"` and provide `smoldotChainSpec` / `smoldotChainSpecUrl` for non-mainnet chains.
+
+### Custom smoldot spec (original flow)
+
 ```js
 import { AgwGameClient } from "agw-game-sdk";
 
 const client = new AgwGameClient({
   connectionMode: "smoldot",
+  networkPreset: "none",
   smoldotChainSpec: "<chain spec json text>",
   signerUri: "//Alice"
 });
@@ -47,6 +81,8 @@ const me = await client.getAgent(registered.agentId);
 const cells = await client.watchSurroundings(2, { agentId: me.id });
 console.log({ me, cells });
 ```
+
+`readWorld()` snapshots include **`fsmState`**, **`fsmAllowedActions`**, and **`fsmConfig`**. **`state`** and **`allowedActions`** stay as compatibility aliases (same values as the `fsm*` fields).
 
 ## LLM Demo
 
@@ -75,6 +111,11 @@ Main entry:
 
 - `AgwGameClient`
 - `createAgwClient`
+- `getFsmAllowedActionsForState`
+- `mainnetPreset`, `resolveMainnetChainSpecJson`, `loadMainnetChainSpecJsonSync`, `AGW_MAINNET_*` constants
+- `createRandomEthWallet`, `walletFromPrivateKey`
+- `AgwFaucetClient`
+- `AgwFsmNpcClient`, `runAutoplayCore`, `defaultNpcPolicy`
 - `PROMPT_FSM_DEFAULTS`
 - `submitAction`
 - `readWorld`
@@ -113,9 +154,16 @@ LLM entry (`agw-game-sdk/llm`):
 - `buildCompactPrompt`, `sanitizeModelOutput`
 - `AGW_TOOLS`, `executeTool` — tool definitions and executor for custom flows
 
+Subpath exports (optional):
+
+- `agw-game-sdk/mainnet-preset` — same symbols as main entry `mainnetPreset` / chain spec loaders
+- `agw-game-sdk/wallet` — `createRandomEthWallet`, `walletFromPrivateKey`
+- `agw-game-sdk/faucet` — `AgwFaucetClient`
+- `agw-game-sdk/fsm-client` — `AgwFsmNpcClient` (also on main entry)
+
 Standalone Gateway HTTP (`agw-game-sdk/standalone-gateway` — not in main entry; use explicit subpath import):
 
-- `StandaloneGatewayClient` — `ethKeygen()` / `evmJsonRpc()` against **agw-standalone-api** (`POST /v1/crypto/eth-keygen`, `POST /v1/chain/evm/jsonrpc`). Requires loopback to the gateway; see **[AGENT_INTEGRATION.md](./AGENT_INTEGRATION.md)** §1.1.
+- `StandaloneGatewayClient` — optional compatibility layer for **agw-standalone-api** (`POST /v1/crypto/eth-keygen`, `POST /v1/chain/evm/jsonrpc`). Requires loopback to the gateway; see **[AGENT_INTEGRATION.md](./AGENT_INTEGRATION.md)** §1.1. Prefer **`createRandomEthWallet`** + **`AgwFaucetClient`** for standalone SDK usage.
 
 ## Registration Whitelist (Admin)
 
