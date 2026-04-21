@@ -3,10 +3,5 @@ npm-debug.log*
 .DS_Store
 *.tgz
 
-# development-only (tracked on internal/full-dev, ignored on main)
-test/
-bin/
-examples/
-scripts/
-.github/
-AGENT_INTEGRATION.md
+# Optional local workspace (not part of the published npm package)
+dev-local/
