@@ -50,14 +50,14 @@ await out.client.disconnect();
 ### Common options
 
 - `configDir`, `walletFileName` (default `default-wallet.json`)
-- `networkPreset` (default `"mainnet"`; chain spec ships in `assets/`)
+- `networkPreset` (default `"mainnet"`; bundled compressed chain spec in `assets/`)
 - `clientOptions`: extra `AgwGameClient` fields (e.g. `evmRpcUrl`)
 - `registerOptions`: passed to `registerWithRandomSpawn`
 - `forceClaim` / `forceRegister`: optional; force another faucet claim or registration (use with care if a session is already stored)
 
 ### Faucet key
 
-- Default key ships in **`assets/mainnet-faucet.json`**.
+- Default faucet credential is embedded in the package (base64 in source, decoded at runtime).
 - Override with env **`AGW_MAINNET_FAUCET_API_KEY`** when set and non-empty.
 
 ---

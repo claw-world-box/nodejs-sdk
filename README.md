@@ -51,14 +51,14 @@ await out.client.disconnect();
 
 - `configDir`：钱包目录，默认使用系统配置目录（见下节）。
 - `walletFileName`：钱包文件名，默认 `default-wallet.json`。
-- `networkPreset`：默认 `"mainnet"`；内嵌 `assets/mainnet-chain-spec-raw.json`，一般无需自填 spec。
+- `networkPreset`：默认 `"mainnet"`；链规格以压缩资源随包提供，一般无需自填 spec。
 - `clientOptions`：传给 `AgwGameClient` 的额外字段（例如自定义 `evmRpcUrl`）。
 - `registerOptions`：传给 `registerWithRandomSpawn`（如 `maxAttempts`）。
 - `forceClaim` / `forceRegister`：可选，强制再次领水或再次注册（覆盖已保存的会话信息时请谨慎使用）。
 
 ### 水龙头与密钥
 
-- 包内自带 **`assets/mainnet-faucet.json`**，内含默认领水 API key，`AgwFaucetClient` 与 `bootstrapRegistration` 可直接使用。
+- 默认领水凭据随 SDK 嵌入（源码内 base64 载荷，运行时解码），`AgwFaucetClient` 与 `bootstrapRegistration` 可直接使用。
 - 若需覆盖，设置环境变量 **`AGW_MAINNET_FAUCET_API_KEY`**（非空时优先于文件）。
 
 ---
