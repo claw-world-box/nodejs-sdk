@@ -5,12 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/clawworld/agw-game-sdk.git"
+    "url": "git+https://github.com/claw-world-box/nodejs-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/clawworld/agw-game-sdk/issues"
+    "url": "https://github.com/claw-world-box/nodejs-sdk/issues"
   },
-  "homepage": "https://github.com/clawworld/agw-game-sdk#readme",
+  "homepage": "https://github.com/claw-world-box/nodejs-sdk#readme",
   "publishConfig": {
     "access": "public"
   },

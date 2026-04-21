@@ -2,6 +2,8 @@
 
 JavaScript SDK for the AGW chain: connect over WebSocket or [smoldot](https://github.com/smol-dot/smoldot), read game state, and submit actions via Substrate extrinsics or optional EVM precompiles.
 
+**npm** publishes this package as the scoped name **`@clawworld/agw-game-sdk`** (npm organization `clawworld`). **Source code** lives under the GitHub organization **claw-world-box**: [github.com/claw-world-box/nodejs-sdk](https://github.com/claw-world-box/nodejs-sdk).
+
 ## Install
 
 ```bash
