@@ -1,7 +1,7 @@
 {
   "name": "@clawworld/agw-game-sdk",
-  "version": "0.1.1",
-  "description": "JavaScript SDK for the AGW chain: browser-friendly client, Substrate RPC, optional EVM precompile path.",
+  "version": "0.3.0",
+  "description": "JavaScript SDK for the AGW chain: browser-friendly client, Substrate RPC, optional EVM precompiles, and mainnet registration helpers.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -21,6 +21,7 @@
   "main": "./src/index.js",
   "files": [
     "src",
+    "assets",
     "rules",
     "README.md",
     "LICENSE"
@@ -30,7 +31,14 @@
     "./rules": "./rules/index.js",
     "./llm": "./src/llm/index.js",
     "./eval": "./src/eval.js",
-    "./standalone-gateway": "./src/standalone-gateway.js"
+    "./standalone-gateway": "./src/standalone-gateway.js",
+    "./mainnet-preset": "./src/mainnet-preset.js",
+    "./wallet": "./src/wallet.js",
+    "./wallet-store": "./src/wallet-store.js",
+    "./faucet": "./src/faucet.js",
+    "./bootstrap": "./src/bootstrap.js",
+    "./session": "./src/session.js",
+    "./fsm-client": "./src/fsm-client.js"
   },
   "scripts": {},
   "dependencies": {

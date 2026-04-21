@@ -2,7 +2,7 @@ import { ApiPromise, Keyring, WsProvider } from "@polkadot/api";
 import { ScProvider } from "@polkadot/rpc-provider/substrate-connect";
 import { blake2AsU8a } from "@polkadot/util-crypto";
 import { Contract, Interface, JsonRpcProvider, Wallet, WebSocketProvider } from "ethers";
-import { DEFAULT_ALLOWED_ACTIONS, PRECOMPILE_EPOCH, PRECOMPILE_RELATIONS, TERRAIN_NAMES, WEI_PER_AGW } from "./constants.js";
+import { PRECOMPILE_EPOCH, PRECOMPILE_RELATIONS, TERRAIN_NAMES, WEI_PER_AGW } from "./constants.js";
 import { parseAgent, parseCell, parseEpoch, parseMessage, parseRuin } from "./parsers.js";
 import { createAlwaysReadyChecker, createSmoldotBridge } from "./smoldot.js";
 import {
@@ -20,6 +20,8 @@ import {
 } from "./utils.js";
 import { submitAction } from "./actions.js";
 import { RELATIONS_ABI, decodeRelationAttitude, int256LikeToNumber } from "./relations.js";
+import { getFsmAllowedActionsForState } from "./fsm.js";
+import { AGW_MAINNET_BOOTNODES, resolveMainnetChainSpecJson } from "./mainnet-preset.js";
 
 /** Epoch precompile static reads (address `0x502`). */
 const EPOCH_VIEW_ABI = ["function getBeaconEntropy() external view returns (uint256)"];
@@ -33,6 +35,8 @@ export class AgwGameClient {
     this.wsTimeoutMs = options.wsTimeoutMs ?? 10_000;
     this.smoldotChainSpec = options.smoldotChainSpec ?? null;
     this.smoldotChainSpecUrl = options.smoldotChainSpecUrl ?? null;
+    /** `"mainnet"` uses embedded AGW mainnet spec when smoldot spec/url omitted. Use `"none"` to require explicit spec. */
+    this.networkPreset = options.networkPreset ?? "mainnet";
     this.smoldotBootnodes = normalizeBootnodes(options.smoldotBootnodes ?? "");
     this.smoldotConfig = options.smoldotConfig ?? {};
     this.signerUri = options.signerUri ?? null;
@@ -114,20 +118,7 @@ export class AgwGameClient {
    * If you use an AGW HTTP gateway, treat its allowed-actions list and validation API as authoritative.
    */
   getAllowedActions(state = null) {
-    const actionsByState = {
-      Explore: ["move", "harvest", "scout", "broadcast", "renew"],
-      InRuin: ["attack", "heal", "move", "broadcast", "transfer"],
-      Encounter: ["broadcast", "move", "heal", "attack", "transfer", "renew"],
-      Critical: ["harvest", "move", "heal", "broadcast", "renew"],
-      Recover: ["harvest", "move", "heal", "broadcast", "renew"],
-      Negotiate: ["broadcast", "transfer", "heal", "move"],
-      Combat: ["attack", "heal", "move", "broadcast", "transfer"],
-      Scout: ["scout", "move", "harvest", "broadcast"]
-    };
-    if (state && actionsByState[state]) {
-      return [...actionsByState[state]];
-    }
-    return [...DEFAULT_ALLOWED_ACTIONS];
+    return getFsmAllowedActionsForState(state);
   }
 
   async getAgentIdsAtCell(x, y) {
@@ -516,12 +507,19 @@ export class AgwGameClient {
       }
       spec = (await response.text()).trim();
     }
+    if (!spec && this.networkPreset === "mainnet") {
+      spec = (await resolveMainnetChainSpecJson()).trim();
+    }
     if (!spec) {
-      throw new Error("smoldot mode needs chain spec json or chain spec url");
+      throw new Error(
+        "smoldot mode needs chain spec json, chain spec url, or networkPreset mainnet with bundled assets"
+      );
     }
     const parsed = JSON.parse(spec);
     const fromSpec = Array.isArray(parsed.bootNodes) ? parsed.bootNodes.filter(Boolean) : [];
-    parsed.bootNodes = Array.from(new Set([...fromSpec, ...this.smoldotBootnodes]));
+    const presetBoot =
+      this.networkPreset === "mainnet" && this.smoldotBootnodes.length === 0 ? AGW_MAINNET_BOOTNODES : [];
+    parsed.bootNodes = Array.from(new Set([...fromSpec, ...this.smoldotBootnodes, ...presetBoot]));
     return JSON.stringify(parsed);
   }
 
