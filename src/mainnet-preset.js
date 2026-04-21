@@ -19,14 +19,34 @@ export const AGW_MAINNET_BOOTNODES = [
 /** Public HTTP base URL of the faucet server (no trailing path); append `/claim`. */
 export const AGW_MAINNET_FAUCET_BASE_URL = "http://150.158.44.248:8787";
 
+/** @type {string|null} */
+let _cachedFaucetApiKey = null;
+
 /**
- * Faucet shared secret: read from `process.env.AGW_MAINNET_FAUCET_API_KEY` only (never commit keys).
- * Empty in browsers unless your bundler injects `process.env`.
+ * Default faucet API key for mainnet claim: `assets/mainnet-faucet.json` (shipped in the npm package).
+ * Override with `process.env.AGW_MAINNET_FAUCET_API_KEY` when set (non-empty).
  */
-export const AGW_MAINNET_FAUCET_API_KEY = (() => {
-  if (typeof process === "undefined" || !process.env) return "";
-  return String(process.env.AGW_MAINNET_FAUCET_API_KEY ?? "").trim();
-})();
+export function loadMainnetFaucetApiKeySync() {
+  if (_cachedFaucetApiKey !== null) return _cachedFaucetApiKey;
+  if (typeof process !== "undefined" && process.env) {
+    const fromEnv = String(process.env.AGW_MAINNET_FAUCET_API_KEY ?? "").trim();
+    if (fromEnv) {
+      _cachedFaucetApiKey = fromEnv;
+      return _cachedFaucetApiKey;
+    }
+  }
+  try {
+    const raw = readFileSync(join(__dirname, "../assets/mainnet-faucet.json"), "utf8");
+    const j = JSON.parse(raw);
+    _cachedFaucetApiKey = String(j.apiKey ?? "").trim();
+  } catch {
+    _cachedFaucetApiKey = "";
+  }
+  return _cachedFaucetApiKey;
+}
+
+/** Resolved once at module load (Node). Same rules as `loadMainnetFaucetApiKeySync`. */
+export const AGW_MAINNET_FAUCET_API_KEY = loadMainnetFaucetApiKeySync();
 
 /**
  * Fallback URL when the npm package `assets/` file is unavailable (e.g. custom bundles).

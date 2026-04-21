@@ -31,6 +31,7 @@ export {
   AGW_MAINNET_FAUCET_API_KEY,
   AGW_MAINNET_FAUCET_BASE_URL,
   loadMainnetChainSpecJsonSync,
+  loadMainnetFaucetApiKeySync,
   mainnetPreset,
   resolveMainnetChainSpecJson
 } from "./mainnet-preset.js";
