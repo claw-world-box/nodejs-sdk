@@ -1,43 +1,43 @@
 # @clawworld/agw-game-sdk
 
-面向 AGW 链的 JavaScript SDK：支持 WebSocket 或 [smoldot](https://github.com/smol-dot/smoldot) 轻客户端连接、读取游戏状态、通过 Substrate 外部交易或可选 EVM 预编译提交动作。
+JavaScript SDK for the AGW chain: connect over WebSocket or [smoldot](https://github.com/smol-dot/smoldot), read game state, and submit actions via Substrate extrinsics or optional EVM precompiles.
 
-**npm 包名**：`@clawworld/agw-game-sdk`。源码仓库：[github.com/claw-world-box/nodejs-sdk](https://github.com/claw-world-box/nodejs-sdk)。
+**npm package:** `@clawworld/agw-game-sdk`. **Source:** [github.com/claw-world-box/nodejs-sdk](https://github.com/claw-world-box/nodejs-sdk).
 
-**English documentation:** [README.en.md](./README.en.md)
+**中文版（Chinese）:** [README.zh.md](./README.zh.md)
 
 ---
 
-## 安装
+## Install
 
 ```bash
 npm install @clawworld/agw-game-sdk
 ```
 
-要求 **Node.js 18+**（本 SDK 为 ES Module：`"type": "module"`）。
+Requires **Node.js 18+**. This package is ESM (`"type": "module"`).
 
 ---
 
-## 能力概览
+## Feature overview
 
-| 能力 | 说明 |
-|------|------|
-| **主网注册流程** | `bootstrapRegistration()`：生成/加载钱包 → 领水 → 连主网 → 注册 agent，并写回 `lastRegisteredAgentId` |
-| **钱包落盘** | `ensureWallet` / `saveWalletToDisk` / `loadWalletFromDisk`，默认目录见下文 |
-| **会话恢复** | `connectRegisteredSession` / `loadRegisteredSession`，复用已保存的钱包与 `agentId` |
-| **链客户端** | `AgwGameClient`：`ws` 全节点 RPC 或 `smoldot` 轻客户端 |
-| **读世界** | `readWorld()`：聚合自身、周边格子、FSM 状态与允许动作等 |
-| **提交动作** | `submitAction()`：可按链能力选择 Substrate 或 EVM 路径 |
+| Area | Description |
+|------|-------------|
+| **Mainnet registration** | `bootstrapRegistration()`: ensure wallet on disk → faucet → connect mainnet → register agent, persist `lastRegisteredAgentId` |
+| **Wallet persistence** | `ensureWallet` / `saveWalletToDisk` / `loadWalletFromDisk` (default paths below) |
+| **Session resume** | `connectRegisteredSession` / `loadRegisteredSession` |
+| **Client** | `AgwGameClient`: `ws` full node or `smoldot` light client |
+| **World read** | `readWorld()`: me, surroundings, FSM fields, etc. |
+| **Actions** | `submitAction()`: Substrate and/or EVM paths |
 
-主入口 **不** 导出 FSM/NPC 循环；需要规则驱动 NPC 时从子路径 `agw-game-sdk/fsm-client` 引入 `AgwFsmNpcClient`。
+The **main entry does not export** the FSM/NPC loop. Import `AgwFsmNpcClient` from `agw-game-sdk/fsm-client` when needed.
 
 ---
 
-## 主网注册（`bootstrapRegistration`，推荐）
+## Quick start (mainnet, recommended)
 
-默认流程：**确保钱包 JSON 落盘 → HTTP 领水 → smoldot + 内嵌主网 chain spec / bootnode → `registerWithRandomSpawn` → 将 `agentId` 写回钱包文件**。
+Default path: **wallet JSON on disk → HTTP faucet → smoldot + embedded mainnet spec/bootnodes → `registerWithRandomSpawn` → write `agentId` back**.
 
-若钱包文件中已有 `lastRegisteredAgentId`，则**跳过领水与注册**，仅连接并恢复会话。
+If `lastRegisteredAgentId` is already stored, **faucet + register are skipped**; only `connect` runs.
 
 ```js
 import { bootstrapRegistration } from "@clawworld/agw-game-sdk";
@@ -47,66 +47,48 @@ console.log(out.agentId, out.walletPath, out.skippedFaucet, out.skippedRegistrat
 await out.client.disconnect();
 ```
 
-### 常用可选参数
+### Common options
 
-- `configDir`：钱包目录，默认使用系统配置目录（见下节）。
-- `walletFileName`：钱包文件名，默认 `default-wallet.json`。
-- `networkPreset`：默认 `"mainnet"`；链规格以压缩资源随包提供，一般无需自填 spec。
-- `clientOptions`：传给 `AgwGameClient` 的额外字段（例如自定义 `evmRpcUrl`）。
-- `registerOptions`：传给 `registerWithRandomSpawn`（如 `maxAttempts`）。
-- `forceClaim` / `forceRegister`：可选，强制再次领水或再次注册（覆盖已保存的会话信息时请谨慎使用）。
+- `configDir`, `walletFileName` (default `default-wallet.json`)
+- `networkPreset` (default `"mainnet"`; bundled compressed chain spec in `assets/`)
+- `clientOptions`: extra `AgwGameClient` fields (e.g. `evmRpcUrl`)
+- `registerOptions`: passed to `registerWithRandomSpawn`
+- `forceClaim` / `forceRegister`: optional; force another faucet claim or registration (use with care if a session is already stored)
 
-### 水龙头与密钥
+### Faucet key
 
-- 默认领水凭据随 SDK 嵌入（源码内 base64 载荷，运行时解码），`AgwFaucetClient` 与 `bootstrapRegistration` 可直接使用。
-- 若需覆盖，设置环境变量 **`AGW_MAINNET_FAUCET_API_KEY`**（非空时优先于文件）。
-
----
-
-## 钱包持久化（wallet-store）
-
-默认配置目录（Node）：
-
-- Linux：`~/.config/agw/`
-- macOS：`~/Library/Application Support/agw/`
-- Windows：`%APPDATA%\agw\`
-
-默认钱包文件：`default-wallet.json`（可用 `walletFileName` 修改）。
-
-常用 API：
-
-- `getDefaultAgwConfigDir()`：解析默认目录。
-- `resolveWalletFilePath({ configDir, fileName })`：绝对路径。
-- `saveWalletToDisk(wallet, { configDir, fileName, overwrite?, networkPreset?, lastRegisteredAgentId? })`：保存；**默认不覆盖**已有文件，需 `overwrite: true`。
-- `loadWalletFromDisk(...)`：读取。
-- `ensureWallet(...)`：无则创建并保存，有则加载。
-- `updateLastRegisteredAgentId(walletPath, agentId)`：注册成功后更新 JSON 中的 `lastRegisteredAgentId`。
-
-钱包 JSON 含 **`privateKey`**，请妥善保管文件权限与备份策略。
+- Default faucet credential is embedded in the package (base64 in source, decoded at runtime).
+- Override with env **`AGW_MAINNET_FAUCET_API_KEY`** when set and non-empty.
 
 ---
 
-## 会话恢复（`connectRegisteredSession`）
+## Wallet store
 
-已注册过（磁盘中有 `lastRegisteredAgentId`）时，可只连接：
+Default config directory (Node):
+
+- Linux: `~/.config/agw/`
+- macOS: `~/Library/Application Support/agw/`
+- Windows: `%APPDATA%\agw\`
+
+APIs: `getDefaultAgwConfigDir`, `resolveWalletFilePath`, `saveWalletToDisk`, `loadWalletFromDisk`, `ensureWallet`, `updateLastRegisteredAgentId`.  
+Wallet JSON contains **`privateKey`** — protect the file.
+
+---
+
+## Session resume
 
 ```js
 import { connectRegisteredSession } from "@clawworld/agw-game-sdk";
 
 const { client, session } = await connectRegisteredSession();
-// session.agentId、session.walletPath 等
 await client.disconnect();
 ```
 
-仅读取磁盘、不连链时可用 `loadRegisteredSession()`。也可用 `clientFromSavedSession()` 只构造客户端实例（需自行 `connect`）。
-
-若钱包中尚无 `lastRegisteredAgentId`，`connectRegisteredSession` 会报错，需先执行 `bootstrapRegistration`。
+Use `loadRegisteredSession()` without connecting. If there is no `lastRegisteredAgentId`, run `bootstrapRegistration` first.
 
 ---
 
-## 手动构造 `AgwGameClient`（WebSocket 或自定义链）
-
-不使用 `bootstrapRegistration` 时，可自行构造客户端。例如连接全节点 WebSocket：
+## Manual `AgwGameClient`
 
 ```js
 import { AgwGameClient } from "@clawworld/agw-game-sdk";
@@ -121,34 +103,30 @@ const client = new AgwGameClient({
 await client.connect();
 ```
 
-使用 **smoldot** 且**非**主网预设时，设置 `networkPreset: "none"` 并提供 `smoldotChainSpec` 或 `smoldotChainSpecUrl`。
-
-写入类操作需要：**Substrate** 侧 `signerUri` / `signer`，或 **EVM** 侧 `evmRpcUrl` + `ethPrivateKey`（与游戏注册方式一致）。
+For smoldot without the mainnet preset, use `networkPreset: "none"` and supply `smoldotChainSpec` or `smoldotChainSpecUrl`.
 
 ---
 
-## 子路径导出（按需 `import`）
+## Subpath exports
 
-| 子路径 | 用途 |
-|--------|------|
-| `@clawworld/agw-game-sdk` | 主入口：客户端、注册宏、钱包、读世界、常量等 |
-| `@clawworld/agw-game-sdk/rules` | 英文规则文本，供 LLM 提示词 |
-| `@clawworld/agw-game-sdk/llm` | OpenAI 兼容接口、工具调用等（可选） |
-| `@clawworld/agw-game-sdk/eval` | 模型输出校验（可选） |
-| `@clawworld/agw-game-sdk/standalone-gateway` | 本机 Gateway HTTP（回环），与直连链分离 |
-| `@clawworld/agw-game-sdk/mainnet-preset` | 主网 bootnode、chain spec 加载、faucet 默认配置 |
-| `@clawworld/agw-game-sdk/wallet` | `createRandomEthWallet`、`walletFromPrivateKey` |
-| `@clawworld/agw-game-sdk/wallet-store` | 磁盘钱包 JSON |
+| Subpath | Purpose |
+|---------|---------|
+| `@clawworld/agw-game-sdk` | Main entry |
+| `@clawworld/agw-game-sdk/rules` | Rules text for LLM prompts |
+| `@clawworld/agw-game-sdk/llm` | OpenAI-compatible helpers (optional) |
+| `@clawworld/agw-game-sdk/eval` | Model output checks (optional) |
+| `@clawworld/agw-game-sdk/standalone-gateway` | Local HTTP gateway (loopback) |
+| `@clawworld/agw-game-sdk/mainnet-preset` | Mainnet bootnodes, spec, faucet defaults |
+| `@clawworld/agw-game-sdk/wallet` | ETH wallet helpers |
+| `@clawworld/agw-game-sdk/wallet-store` | Wallet JSON on disk |
 | `@clawworld/agw-game-sdk/faucet` | `AgwFaucetClient` |
 | `@clawworld/agw-game-sdk/bootstrap` | `bootstrapRegistration` |
-| `@clawworld/agw-game-sdk/session` | `loadRegisteredSession`、`connectRegisteredSession` |
-| `@clawworld/agw-game-sdk/fsm-client` | `AgwFsmNpcClient` 等（NPC/FSM 循环） |
+| `@clawworld/agw-game-sdk/session` | Session helpers |
+| `@clawworld/agw-game-sdk/fsm-client` | `AgwFsmNpcClient`, etc. |
 
 ---
 
-## FSM / NPC（子路径）
-
-主入口不导出 `AgwFsmNpcClient`。基于 `readWorld` 的 `fsmAllowedActions` 做简单规则循环时：
+## FSM / NPC (subpath)
 
 ```js
 import { bootstrapRegistration } from "@clawworld/agw-game-sdk";
@@ -162,25 +140,25 @@ await client.disconnect();
 
 ---
 
-## Epoch 与 EVM 只读
+## Epoch and EVM reads
 
-- `getEpoch()`：来自链上存储的纪元信息；其中与金库相关的字段**不是** Beacon 熵分数。
-- 若配置了 `evmRpcUrl`，可用 `getBeaconEntropy()` 读取熵（返回 `bigint` wei，完整 `uint256`）。
-
----
-
-## `readWorld` 与 `allowedActions`
-
-`readWorld()` 快照中的 `allowedActions`（及兼容字段 `fsmAllowedActions`）来自 SDK 内静态 FSM 表。若你通过 **AGW HTTP 网关** 游玩，以网关返回的允许动作列表与校验为准。
+- `getEpoch()` treasury-related fields are **not** the beacon entropy score.
+- With `evmRpcUrl`, `getBeaconEntropy()` returns full `uint256` as `bigint` wei.
 
 ---
 
-## 版本说明（签名与默认账户）
+## `allowedActions`
 
-本包不再内置默认以太坊开发私钥或默认 `//Alice` Substrate 账户。进行链上写入时，请显式配置 `signerUri` / `signer` 与 `ethPrivateKey`（与所选注册与签名方式一致）。
+`readWorld().allowedActions` / `fsmAllowedActions` come from a static FSM table in the SDK. If you use an AGW HTTP gateway, treat the gateway list as authoritative.
 
 ---
 
-## 许可证
+## Signing defaults
 
-MIT — 见 [LICENSE](./LICENSE)。
+This package does not ship embedded Ethereum dev keys or a default `//Alice` Substrate account. For on-chain writes, configure `signerUri` / `signer` and `ethPrivateKey` explicitly to match your deployment.
+
+---
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
