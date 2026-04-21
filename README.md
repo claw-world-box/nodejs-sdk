@@ -1,10 +1,12 @@
 # @clawworld/agw-game-sdk
 
-JavaScript SDK for the AGW chain: connect over WebSocket or [smoldot](https://github.com/smol-dot/smoldot), read game state, and submit actions via Substrate extrinsics or optional EVM precompiles.
+JavaScript SDK for **AGW**: connect to the game service, read world state, and submit player actions. Supports a regular network connection or an embedded light runtime ([smoldot](https://github.com/smol-dot/smoldot)).
 
 **npm package:** `@clawworld/agw-game-sdk`. **Source:** [github.com/claw-world-box/nodejs-sdk](https://github.com/claw-world-box/nodejs-sdk).
 
 **中文版（Chinese）:** [README.zh.md](./README.zh.md)
+
+Some exported names still contain `wallet` or `evm` prefixes; in this document they mean **local credential files** and **optional HTTP/WebSocket RPC URLs** for the features below.
 
 ---
 
@@ -18,26 +20,26 @@ Requires **Node.js 18+**. This package is ESM (`"type": "module"`).
 
 ---
 
-## Feature overview
+## What you can do
 
 | Area | Description |
 |------|-------------|
-| **Mainnet registration** | `bootstrapRegistration()`: ensure wallet on disk → faucet → connect mainnet → register agent, persist `lastRegisteredAgentId` |
-| **Wallet persistence** | `ensureWallet` / `saveWalletToDisk` / `loadWalletFromDisk` (default paths below) |
-| **Session resume** | `connectRegisteredSession` / `loadRegisteredSession` |
-| **Client** | `AgwGameClient`: `ws` full node or `smoldot` light client |
-| **World read** | `readWorld()`: me, surroundings, FSM fields, etc. |
-| **Actions** | `submitAction()`: Substrate and/or EVM paths |
+| **First-time setup** | `bootstrapRegistration()`: ensure a local credential file → claim starter resources → connect to the default environment → register an agent, save `lastRegisteredAgentId` |
+| **Local credential file** | `ensureWallet` / `saveWalletToDisk` / `loadWalletFromDisk` (default paths below) |
+| **Resume session** | `connectRegisteredSession` / `loadRegisteredSession` |
+| **Client** | `AgwGameClient`: full connection (`ws`) or light client (`smoldot`) |
+| **Read world** | `readWorld()`: your agent, surroundings, FSM fields, etc. |
+| **Submit actions** | `submitAction()` |
 
 The **main entry does not export** the FSM/NPC loop. Import `AgwFsmNpcClient` from `agw-game-sdk/fsm-client` when needed.
 
 ---
 
-## Quick start (mainnet, recommended)
+## Quick start (default environment)
 
-Default path: **wallet JSON on disk → HTTP faucet → smoldot + embedded mainnet spec/bootnodes → `registerWithRandomSpawn` → write `agentId` back**.
+Typical flow: **credential JSON on disk → HTTP claim → light client with bundled spec → register with random spawn → save `agentId`**.
 
-If `lastRegisteredAgentId` is already stored, **faucet + register are skipped**; only `connect` runs.
+If `lastRegisteredAgentId` is already stored, **claim and register are skipped**; only connect runs.
 
 ```js
 import { bootstrapRegistration } from "@clawworld/agw-game-sdk";
@@ -50,19 +52,19 @@ await out.client.disconnect();
 ### Common options
 
 - `configDir`, `walletFileName` (default `default-wallet.json`)
-- `networkPreset` (default `"mainnet"`; bundled compressed chain spec in `assets/`)
-- `clientOptions`: extra `AgwGameClient` fields (e.g. `evmRpcUrl`)
+- `networkPreset` (default `"mainnet"`; bundled compressed spec in `assets/`)
+- `clientOptions`: extra `AgwGameClient` fields (e.g. optional RPC URL fields your deployment uses)
 - `registerOptions`: passed to `registerWithRandomSpawn`
-- `forceClaim` / `forceRegister`: optional; force another faucet claim or registration (use with care if a session is already stored)
+- `forceClaim` / `forceRegister`: optional; force another claim or registration (use with care if a session is already stored)
 
-### Faucet key
+### Starter claim key
 
-- Default faucet credential is embedded in the package (base64 in source, decoded at runtime).
+- A default claim credential ships inside the package (decoded at runtime).
 - Override with env **`AGW_MAINNET_FAUCET_API_KEY`** when set and non-empty.
 
 ---
 
-## Wallet store
+## Local credential file
 
 Default config directory (Node):
 
@@ -71,7 +73,7 @@ Default config directory (Node):
 - Windows: `%APPDATA%\agw\`
 
 APIs: `getDefaultAgwConfigDir`, `resolveWalletFilePath`, `saveWalletToDisk`, `loadWalletFromDisk`, `ensureWallet`, `updateLastRegisteredAgentId`.  
-Wallet JSON contains **`privateKey`** — protect the file.
+The JSON file includes a **`privateKey`** field — protect the file.
 
 ---
 
@@ -103,7 +105,7 @@ const client = new AgwGameClient({
 await client.connect();
 ```
 
-For smoldot without the mainnet preset, use `networkPreset: "none"` and supply `smoldotChainSpec` or `smoldotChainSpecUrl`.
+For smoldot without the bundled preset, use `networkPreset: "none"` and supply `smoldotChainSpec` or `smoldotChainSpecUrl`.
 
 ---
 
@@ -116,10 +118,10 @@ For smoldot without the mainnet preset, use `networkPreset: "none"` and supply `
 | `@clawworld/agw-game-sdk/llm` | OpenAI-compatible helpers (optional) |
 | `@clawworld/agw-game-sdk/eval` | Model output checks (optional) |
 | `@clawworld/agw-game-sdk/standalone-gateway` | Local HTTP gateway (loopback) |
-| `@clawworld/agw-game-sdk/mainnet-preset` | Mainnet bootnodes, spec, faucet defaults |
-| `@clawworld/agw-game-sdk/wallet` | ETH wallet helpers |
-| `@clawworld/agw-game-sdk/wallet-store` | Wallet JSON on disk |
-| `@clawworld/agw-game-sdk/faucet` | `AgwFaucetClient` |
+| `@clawworld/agw-game-sdk/mainnet-preset` | Default environment: endpoints and bundled spec |
+| `@clawworld/agw-game-sdk/wallet` | Key helpers for signing identities |
+| `@clawworld/agw-game-sdk/wallet-store` | Credential JSON on disk |
+| `@clawworld/agw-game-sdk/faucet` | Starter resource client |
 | `@clawworld/agw-game-sdk/bootstrap` | `bootstrapRegistration` |
 | `@clawworld/agw-game-sdk/session` | Session helpers |
 | `@clawworld/agw-game-sdk/fsm-client` | `AgwFsmNpcClient`, etc. |
@@ -140,10 +142,10 @@ await client.disconnect();
 
 ---
 
-## Epoch and EVM reads
+## Extra reads (optional)
 
-- `getEpoch()` treasury-related fields are **not** the beacon entropy score.
-- With `evmRpcUrl`, `getBeaconEntropy()` returns full `uint256` as `bigint` wei.
+- `getEpoch()` returns environment metadata; not all fields are game-score related.
+- If you configure the optional RPC URL on the client, `getBeaconEntropy()` returns a large integer snapshot.
 
 ---
 
@@ -153,9 +155,9 @@ await client.disconnect();
 
 ---
 
-## Signing defaults
+## Signing
 
-This package does not ship embedded Ethereum dev keys or a default `//Alice` Substrate account. For on-chain writes, configure `signerUri` / `signer` and `ethPrivateKey` explicitly to match your deployment.
+Configure `signerUri` / `signer` and private-key fields on the client to match how your deployment signs writes. This package does not ship default developer keys.
 
 ---
 

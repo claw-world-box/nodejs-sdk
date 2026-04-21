@@ -1,7 +1,7 @@
 {
   "name": "@clawworld/agw-game-sdk",
-  "version": "0.3.2",
-  "description": "Official JavaScript SDK for the AGW chain: game client (Substrate and EVM), mainnet registration helpers, smoldot and WebSocket.",
+  "version": "0.3.3",
+  "description": "Official JavaScript SDK for the AGW game: connect, read world state, submit actions; registration helpers, smoldot and WebSocket.",
   "license": "MIT",
   "repository": {
     "type": "git",
