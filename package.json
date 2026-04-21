@@ -16,6 +16,7 @@
     "assets",
     "rules",
     "bin",
+    "scripts",
     "README.md",
     "AGENT_INTEGRATION.md"
   ],
@@ -37,7 +38,8 @@
     "agw-whitelist-admin": "bin/agw-whitelist-admin.js"
   },
   "scripts": {
-    "test": "node --test ./test/*.test.js"
+    "test": "node --test ./test/*.test.js",
+    "smoke:mainnet": "node ./scripts/integration-mainnet-smoke.mjs"
   },
   "dependencies": {
     "@polkadot/api": "^16.4.9",
